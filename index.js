@@ -44,6 +44,7 @@ const WA_TOKEN = process.env.WA_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const META_APP_SECRET = process.env.META_APP_SECRET;
+const DEBUG_WEBHOOK = (process.env.DEBUG_WEBHOOK || "1") === "1";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -973,6 +974,13 @@ async function uploadMetaMediaBuffer({ buffer, mimeType, filename }) {
 }
 
 async function sendWhatsAppLocation(to, { latitude, longitude, name = "", address = "" }, reportSource = "BOT") {
+  webhookLog("sendWhatsAppLocation.start", {
+    to: String(to),
+    reportSource,
+    latitude,
+    longitude,
+    name: previewForLog(name, 80),
+  });
   const lat = Number(latitude);
   const lng = Number(longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -1009,6 +1017,8 @@ async function sendWhatsAppLocation(to, { latitude, longitude, name = "", addres
       address: address || undefined,
     },
   });
+
+  webhookLog("sendWhatsAppLocation.ok", { to: String(to), reportSource });
 }
 
 async function sendWhatsAppMediaById(to, type, mediaId, { caption = "", filename = "" } = {}, reportSource = "BOT") {
@@ -1642,18 +1652,59 @@ function getAnyTourByKey(key) {
   return getRealTourByKey(key) || getTourByKey(key);
 }
 
+function previewForLog(value, max = 160) {
+  const raw = String(value || "").replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  return raw.length > max ? `${raw.slice(0, max)}…` : raw;
+}
+
+function webhookLog(stage, data = undefined) {
+  if (!DEBUG_WEBHOOK) return;
+  const prefix = `[WEBHOOK][${new Date().toISOString()}] ${stage}`;
+  if (typeof data === "undefined") {
+    console.log(prefix);
+    return;
+  }
+  try {
+    console.log(prefix, JSON.stringify(data));
+  } catch {
+    console.log(prefix, data);
+  }
+}
+
 function verifyMetaSignature(req) {
-  if (!META_APP_SECRET) return true;
+  if (!META_APP_SECRET) {
+    webhookLog("verifyMetaSignature.skip", { reason: "META_APP_SECRET missing" });
+    return true;
+  }
+
   const signature = req.get("X-Hub-Signature-256");
-  if (!signature) return false;
+  if (!signature) {
+    webhookLog("verifyMetaSignature.fail", {
+      reason: "missing_signature_header",
+      rawBodyBytes: req.rawBody?.length || 0,
+    });
+    return false;
+  }
 
   const expected =
     "sha256=" +
     crypto.createHmac("sha256", META_APP_SECRET).update(req.rawBody || Buffer.from("")).digest("hex");
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch {
+    const ok = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    webhookLog(ok ? "verifyMetaSignature.ok" : "verifyMetaSignature.fail", {
+      reason: ok ? "matched" : "mismatch",
+      hasSignatureHeader: true,
+      rawBodyBytes: req.rawBody?.length || 0,
+    });
+    return ok;
+  } catch (err) {
+    webhookLog("verifyMetaSignature.fail", {
+      reason: "timing_safe_equal_error",
+      detail: err?.message || String(err),
+      rawBodyBytes: req.rawBody?.length || 0,
+    });
     return false;
   }
 }
@@ -3173,6 +3224,12 @@ function buildRealTourLeadSummary(session, phoneDigits) {
 // WhatsApp send helpers
 // =========================
 async function sendWhatsAppText(to, text, reportSource = "BOT") {
+  webhookLog("sendWhatsAppText.start", {
+    to: String(to),
+    reportSource,
+    length: String(text || "").length,
+    preview: previewForLog(text, 180),
+  });
   const url = `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`;
   await axios.post(
     url,
@@ -3186,6 +3243,12 @@ async function sendWhatsAppText(to, text, reportSource = "BOT") {
     body: String(text),
     source: reportSource,
     kind: "TEXT",
+  });
+
+  webhookLog("sendWhatsAppText.ok", {
+    to: String(to),
+    reportSource,
+    length: String(text || "").length,
   });
 }
 
@@ -4388,7 +4451,17 @@ app.post("/webhook", async (req, res) => {
   let session = null;
 
   try {
-    if (!verifyMetaSignature(req)) return res.sendStatus(403);
+    webhookLog("incoming.request", {
+      object: req.body?.object || null,
+      entryCount: Array.isArray(req.body?.entry) ? req.body.entry.length : 0,
+      hasSignature256: !!req.get("X-Hub-Signature-256"),
+      rawBodyBytes: req.rawBody?.length || 0,
+    });
+
+    if (!verifyMetaSignature(req)) {
+      webhookLog("exit.invalid_signature", { status: 403 });
+      return res.sendStatus(403);
+    }
 
     const entry = req.body.entry?.[0];
     const change = entry?.changes?.[0];
@@ -4397,20 +4470,54 @@ app.post("/webhook", async (req, res) => {
     const incomingPhoneNumberId = String(value?.metadata?.phone_number_id || "").trim();
     const expectedPhoneNumberId = String(PHONE_NUMBER_ID || "").trim();
 
+    webhookLog("payload.summary", {
+      field: change?.field || null,
+      hasMessages: Array.isArray(value?.messages) && value.messages.length > 0,
+      hasStatuses: Array.isArray(value?.statuses) && value.statuses.length > 0,
+      incomingPhoneNumberId: incomingPhoneNumberId || null,
+      expectedPhoneNumberId: expectedPhoneNumberId || null,
+      from: value?.messages?.[0]?.from || null,
+      messageType: value?.messages?.[0]?.type || null,
+      contactName: value?.contacts?.[0]?.profile?.name || null,
+    });
+
     if (incomingPhoneNumberId && expectedPhoneNumberId && incomingPhoneNumberId !== expectedPhoneNumberId) {
+      webhookLog("exit.phone_number_mismatch", {
+        incomingPhoneNumberId,
+        expectedPhoneNumberId,
+      });
       return res.sendStatus(200);
     }
 
     const msg = value?.messages?.[0];
-    if (!msg) return res.sendStatus(200);
+    if (!msg) {
+      webhookLog("exit.no_message", {
+        field: change?.field || null,
+        hasStatuses: Array.isArray(value?.statuses) && value.statuses.length > 0,
+      });
+      return res.sendStatus(200);
+    }
 
     from = msg.from;
-    if (!from) return res.sendStatus(200);
+    if (!from) {
+      webhookLog("exit.no_from", { msgType: msg?.type || null, msgId: msg?.id || null });
+      return res.sendStatus(200);
+    }
 
     session = await getSession(from);
+    webhookLog("session.loaded", {
+      from,
+      state: session?.state || null,
+      greeted: !!session?.greeted,
+      conversationMode: session?.conversationMode || "bot",
+      lastMsgId: session?.lastMsgId || null,
+    });
 
     const msgId = msg?.id;
-    if (msgId && session.lastMsgId === msgId) return res.sendStatus(200);
+    if (msgId && session.lastMsgId === msgId) {
+      webhookLog("exit.duplicate_message", { from, msgId });
+      return res.sendStatus(200);
+    }
     if (msgId) session.lastMsgId = msgId;
 
     markUserActivity(session);
@@ -4419,7 +4526,21 @@ app.post("/webhook", async (req, res) => {
     const userTextRaw = preprocessed.userText;
     const userText = (userTextRaw || "").trim();
     const tNorm = normalizeText(userText);
-    if (!userText) return res.sendStatus(200);
+    webhookLog("message.preprocessed", {
+      from,
+      msgId: msg?.id || null,
+      msgType: msg?.type || null,
+      mediaKind: preprocessed?.mediaKind || null,
+      userText: previewForLog(userText, 220),
+    });
+    if (!userText) {
+      webhookLog("exit.empty_user_text", {
+        from,
+        msgType: msg?.type || null,
+        mediaKind: preprocessed?.mediaKind || null,
+      });
+      return res.sendStatus(200);
+    }
 
     session.lastInboundMediaKind = preprocessed.mediaKind || "";
     session.lastInboundMediaSummary = truncateText(preprocessed.mediaSummary || "", 1000);
@@ -4442,6 +4563,7 @@ app.post("/webhook", async (req, res) => {
     if (bothubInboundAck?.conversationId) session.hubConversationId = String(bothubInboundAck.conversationId);
 
     if (isHumanModeDisableCommand(tNorm)) {
+      webhookLog("flow.human_mode_disable", { from, state: session?.state || null });
       session.conversationMode = "bot";
       await saveSession(from, session);
       await sendWhatsAppText(from, "🤖 Listo. Reactivé el asistente virtual. Escribe *menú* para ver las opciones.");
@@ -4449,6 +4571,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     if (isHumanModeEnableCommand(tNorm)) {
+      webhookLog("flow.human_mode_enable", { from, state: session?.state || null });
       session.conversationMode = "human";
       await saveSession(from, session);
       await sendWhatsAppText(from, "👤 Perfecto. Dejo la conversación en modo humano para que continúe un asesor.");
@@ -4456,6 +4579,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     if (session.conversationMode === "human") {
+      webhookLog("exit.human_mode_active", { from, state: session?.state || null });
       await saveSession(from, session);
       return res.sendStatus(200);
     }
@@ -4495,11 +4619,13 @@ app.post("/webhook", async (req, res) => {
       tNorm.includes("ferry");
 
     if (session.greeted && session.state === "idle" && isGreeting(tNorm) && !hasEarlyIntent) {
+      webhookLog("flow.quick_help", { from, state: session?.state || null, greeted: !!session?.greeted });
       await sendWhatsAppText(from, quickHelpText());
       return res.sendStatus(200);
     }
 
     if (!session.greeted && session.state === "idle" && isGreeting(tNorm) && !hasEarlyIntent) {
+      webhookLog("flow.first_greeting_menu", { from, state: session?.state || null });
       session.greeted = true;
       armMenuInactivityReminder(session);
       await sendWhatsAppText(from, mainMenuText());
@@ -5000,6 +5126,12 @@ Aquí tienes las *actividades y parques temáticos disponibles*.`);
     await sendWhatsAppText(from, reply);
     return res.sendStatus(200);
   } catch (e) {
+    webhookLog("error.main_webhook", {
+      from: from || null,
+      state: session?.state || null,
+      conversationMode: session?.conversationMode || null,
+      detail: e?.response?.data || e?.message || String(e),
+    });
     console.error("Webhook error:", e?.response?.data || e?.message || e);
     try {
       if (from) {
