@@ -246,6 +246,9 @@ function defaultSession() {
     pendingTransferRoute: null,
     pendingAdvisorTopic: null,
 
+    lastPackages: [],
+    packageMenuMode: "main",
+
     lastBooking: null,
     greeted: false,
     lastMsgId: null,
@@ -286,6 +289,10 @@ function sanitizeSession(session) {
 
   if (!Array.isArray(session.lastRealTours)) session.lastRealTours = [];
   session.lastRealTours = session.lastRealTours.slice(0, 50);
+
+  if (!Array.isArray(session.lastPackages)) session.lastPackages = [];
+  session.lastPackages = session.lastPackages.slice(0, 20);
+  if (typeof session.packageMenuMode !== "string") session.packageMenuMode = "main";
 
   if (!session.lead || typeof session.lead !== "object") {
     session.lead = defaultLead();
@@ -455,6 +462,9 @@ function clearIntakeFlow(session) {
   session.pendingNights = null;
   session.pendingTransferRoute = null;
   session.pendingAdvisorTopic = null;
+
+  session.lastPackages = [];
+  session.packageMenuMode = "main";
 }
 
 function disableMenuInactivityReminder(session) {
@@ -2056,13 +2066,15 @@ function detectPackageDestinationKeyFromUser(text, session = null) {
     if (t === norm || t.includes(norm)) return p.key;
   }
 
+  if (t.includes("promociones disponibles") || t === "promociones" || t === "promocion" || t.includes("ver promociones")) return "__ver_promociones__";
   if (t.includes("sin visa")) return "destinos_sin_visa";
   if (t.includes("con visa")) return "destinos_con_visa";
   if (t.includes("hard rock")) return "hard_rock_punta_cana_mayo_2026";
   if (t.includes("lopesan")) return "lopesan_costa_bavaro_abril_2026";
   if (t.includes("sunscape") || t.includes("dominicus")) return "sunscape_dominicus_abril_2026";
-  if (t.includes("cofresi") || t.includes("cofresi")) return "cofresi_palm_beach_abril_2026";
+  if (t.includes("cofresi")) return "cofresi_palm_beach_abril_2026";
   if (t.includes("lifestyle tropical")) return "lifestyle_tropical_abril_2026";
+  if (t.includes("cotizacion personalizada") || t.includes("cotización personalizada")) return "otro_destino";
   if (t.includes("otro destino")) return "otro_destino";
   return null;
 }
@@ -2704,9 +2716,10 @@ Envíamelo así: 829XXXXXXX`);
 async function startSimpleServiceFlow({ session, serviceLineKey, from }) {
   if (serviceLineKey === "paquetes_vacacionales") {
     session.state = "await_package_destination";
+    session.packageMenuMode = "main";
     await sendWhatsAppText(from, `Perfecto 🌍 Vamos con *paquetes internacionales y promociones*.
 
-Te mostraré el listado completo y puedes responder con el *número* o con el *nombre* de la opción que deseas ver.`);
+Selecciona una opción principal y luego te mostraré el detalle o las promociones disponibles.`);
     await sendPackageDestinationsList(from, session);
     return true;
   }
@@ -3503,26 +3516,52 @@ async function sendTourOriginsList(to) {
   });
 }
 
+const PACKAGE_MAIN_MENU_OPTIONS = [
+  { key: "destinos_sin_visa", title: "Ver destinos sin visa" },
+  { key: "destinos_con_visa", title: "Ver destinos con visa" },
+  { key: "__ver_promociones__", title: "Ver promociones disponibles" },
+  { key: "otro_destino", title: "Solicitar una cotización personalizada" },
+];
+
+function getPackagePromotionOptions() {
+  return PACKAGE_DESTINATIONS.filter((p) => !["destinos_sin_visa", "destinos_con_visa", "otro_destino"].includes(p.key));
+}
+
+function setPackageMenuOptions(session, options, mode = "main") {
+  if (!session) return;
+  session.packageMenuMode = mode;
+  session.lastPackages = options.map((item) => ({ key: item.key, title: item.title }));
+}
+
 function formatPackageDestinationsTextList(session) {
-  const packages = Array.isArray(PACKAGE_DESTINATIONS) ? PACKAGE_DESTINATIONS : [];
-  if (!packages.length) return "No encontré opciones disponibles ahora mismo 🙏";
-  if (session) session.lastPackages = packages.map((p) => ({ key: p.key, title: p.title }));
+  const options = PACKAGE_MAIN_MENU_OPTIONS;
+  setPackageMenuOptions(session, options, "main");
   return (
-    `🌍 *Paquetes internacionales y promociones*
+    `🌍 *Paquetes internacionales y promociones*\n\n` +
+    `Selecciona una opción:\n\n` +
+    options.map((p, i) => `${i + 1}. ${p.title}`).join("\n") +
+    `\n\nPuedes responder con el *número* o escribir el *nombre* de la opción.`
+  );
+}
 
-` +
-    `Estas son las opciones disponibles:
-
-` +
+function formatPackagePromotionsTextList(session) {
+  const packages = getPackagePromotionOptions();
+  if (!packages.length) return "No encontré promociones disponibles ahora mismo 🙏";
+  setPackageMenuOptions(session, packages, "promos");
+  return (
+    `✨ *Promociones disponibles*\n\n` +
     packages.map((p, i) => `${i + 1}. ${p.title}`).join("\n") +
-    `
-
-Responde con el *número* o con el *nombre* de la opción que deseas ver.`
+    `\n\nResponde con el *número* o con el *nombre* de la promoción que deseas ver.\n\n` +
+    `↩️ Si quieres volver, escribe *atrás*.`
   );
 }
 
 async function sendPackageDestinationsList(to, session = null) {
   await sendWhatsAppText(to, formatPackageDestinationsTextList(session));
+}
+
+async function sendPackagePromotionsList(to, session = null) {
+  await sendWhatsAppText(to, formatPackagePromotionsTextList(session));
 }
 
 async function sendRealTourGroupsList(to, session) {
@@ -4715,10 +4754,17 @@ app.post("/webhook", async (req, res) => {
       }
 
       if (["await_package_destination", "await_package_name", "await_package_date", "await_package_people", "await_package_children", "await_package_children_ages"].includes(session.state)) {
+        if (session.state === "await_package_destination" && session.packageMenuMode === "promos") {
+          session.packageMenuMode = "main";
+          await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *paquetes internacionales y promociones*.`);
+          await sendPackageDestinationsList(from, session);
+          return res.sendStatus(200);
+        }
+
         clearIntakeFlow(session);
         session.pendingServiceLine = "paquetes_vacacionales";
         session.state = "await_package_destination";
-        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al listado de *paquetes internacionales y promociones*. Responde con el *número* o el *nombre* de la opción que quieres ver.`);
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *paquetes internacionales y promociones*.`);
         await sendPackageDestinationsList(from, session);
         return res.sendStatus(200);
       }
@@ -4932,9 +4978,23 @@ Ahora indícame tu *nombre completo*.`);
       const packageKey = detectPackageDestinationKeyFromUser(userText, session);
       if (!packageKey) {
         await sendWhatsAppText(from, `Selecciona una de las *opciones disponibles* respondiendo con el *número* o el *nombre* 🙏`);
-        await sendPackageDestinationsList(from, session);
+        if (session.packageMenuMode === "promos") {
+          await sendPackagePromotionsList(from, session);
+        } else {
+          await sendPackageDestinationsList(from, session);
+        }
         return res.sendStatus(200);
       }
+
+      if (packageKey === "__ver_promociones__") {
+        disableMenuInactivityReminder(session);
+        await sendWhatsAppText(from, `✨ *Promociones disponibles*
+
+Aquí te muestro las promociones actuales para que elijas la que deseas consultar.`);
+        await sendPackagePromotionsList(from, session);
+        return res.sendStatus(200);
+      }
+
       disableMenuInactivityReminder(session);
       session.pendingDestination = packageKey;
       session.state = "await_package_name";
