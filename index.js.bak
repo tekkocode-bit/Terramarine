@@ -33,6 +33,124 @@ const REAL_TOUR_GROUP_ID_TO_KEY = Object.fromEntries(REAL_TOUR_GROUPS.map((g) =>
 const REAL_TOURS = safeJson(process.env.REAL_TOUR_CATALOG_JSON, null) || buildRealToursCatalog();
 const REAL_TOUR_ID_TO_KEY = Object.fromEntries(REAL_TOURS.map((t) => [t.id, t.key]));
 
+const DAYPASS_RESORT_TOUR_KEYS = [
+  "whala_boca_chica_daypass",
+  "hodelpa_garden_suite_daypass",
+  "emotions_juan_dolio_daypass",
+  "coral_costa_caribe_daypass",
+  "dreams_dominicus_daypass",
+  "whala_bavaro_daypass",
+  "nickelodeon_daypass",
+  "royalton_splash_daypass",
+  "royalton_bavaro_daypass",
+  "royalton_chic_daypass",
+  "emotions_puerto_plata_daypass",
+];
+
+const DAYPASS_EXCURSION_TOUR_KEYS = [
+  "scape_park",
+  "bavaro_adventure_park",
+  "coco_bongo",
+  "caribbean_lake_park",
+  "domitai_park",
+  "ocean_world",
+  "dinner_in_the_sky",
+  "panaca",
+  "hacienda_park",
+  "boat_party",
+];
+
+const PARKS_THEME_TOUR_KEYS = [
+  "scape_park",
+  "bavaro_adventure_park",
+  "caribbean_lake_park",
+  "domitai_park",
+  "ocean_world",
+  "panaca",
+  "hacienda_park",
+];
+
+const ACTIVITIES_TOUR_KEYS = [
+  "coco_bongo",
+  "dinner_in_the_sky",
+  "boat_party",
+];
+
+const HOTEL_SCOPE_OPTIONS = [
+  { key: "nacionales", title: "Nacionales" },
+  { key: "internacionales", title: "Internacionales" },
+];
+
+const HOTEL_NATIONAL_STAY_OPTIONS = [
+  { key: "solo_alojamiento", title: "Solo alojamiento" },
+  { key: "todo_incluido", title: "Todo incluido" },
+];
+
+const HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS = [
+  { key: "familiares", title: "Familiares 👪" },
+  { key: "solo_adultos", title: "Solo adultos 🔞" },
+  { key: "parque_acuatico", title: "Parque acuático 💦" },
+];
+
+const HOTEL_VIEW_MODE_OPTIONS = [
+  { key: "por_polo", title: "Por polo turístico" },
+  { key: "por_presupuesto", title: "Por presupuesto" },
+];
+
+const HOTEL_POLO_OPTIONS = {
+  familiares: [
+    { key: "boca_chica_juan_dolio", title: "Boca Chica - Juan Dolio" },
+    { key: "la_romana", title: "La Romana" },
+    { key: "bavaro_punta_cana", title: "Bávaro - Punta Cana" },
+    { key: "miches", title: "Miches" },
+    { key: "samana", title: "Samaná" },
+    { key: "puerto_plata", title: "Puerto Plata" },
+  ],
+  solo_adultos: [
+    { key: "la_romana", title: "La Romana" },
+    { key: "bavaro_punta_cana", title: "Bávaro - Punta Cana" },
+    { key: "miches", title: "Miches" },
+    { key: "samana", title: "Samaná" },
+  ],
+  parque_acuatico: [
+    { key: "para_ninos", title: "Para niños" },
+    { key: "para_grandes_y_chicos", title: "Para grandes y chicos" },
+  ],
+};
+
+const HOTEL_BUDGET_OPTIONS = {
+  familiares: [
+    { key: "menos_30000", title: "Menos de RD$30,000" },
+    { key: "30000_40000", title: "RD$30,000 - RD$40,000" },
+    { key: "40000_50000", title: "RD$40,000 - RD$50,000" },
+    { key: "50000_60000", title: "RD$50,000 - RD$60,000" },
+    { key: "mas_60000", title: "Más de RD$60,000" },
+  ],
+  solo_adultos: [
+    { key: "30000_40000", title: "RD$30,000 - RD$40,000" },
+    { key: "40000_50000", title: "RD$40,000 - RD$50,000" },
+    { key: "50000_60000", title: "RD$50,000 - RD$60,000" },
+    { key: "mas_60000", title: "Más de RD$60,000" },
+  ],
+  parque_acuatico: [
+    { key: "menos_40000", title: "Menos de RD$40,000" },
+    { key: "40000_50000", title: "RD$40,000 - RD$50,000" },
+    { key: "50000_60000", title: "RD$50,000 - RD$60,000" },
+    { key: "mas_60000", title: "Más de RD$60,000" },
+  ],
+};
+
+const CRUISE_FERRY_OPTIONS = [
+  { key: "ferries_caribe", title: "Ferries del Caribe" },
+  { key: "desde_republica_dominicana", title: "Desde República Dominicana" },
+  { key: "internacionales", title: "Internacionales" },
+];
+
+const PARKS_ACTIVITIES_OPTIONS = [
+  { key: "parques_tematicos_rd", title: "Parques temáticos" },
+  { key: "actividades_rd", title: "Actividades" },
+];
+
 const execFileAsync = promisify(execFile);
 
 // =========================
@@ -44,6 +162,7 @@ const WA_TOKEN = process.env.WA_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const META_APP_SECRET = process.env.META_APP_SECRET;
+const DEBUG_WEBHOOK = (process.env.DEBUG_WEBHOOK || "1") === "1";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -983,6 +1102,13 @@ async function uploadMetaMediaBuffer({ buffer, mimeType, filename }) {
 }
 
 async function sendWhatsAppLocation(to, { latitude, longitude, name = "", address = "" }, reportSource = "BOT") {
+  webhookLog("sendWhatsAppLocation.start", {
+    to: String(to),
+    reportSource,
+    latitude,
+    longitude,
+    name: previewForLog(name, 80),
+  });
   const lat = Number(latitude);
   const lng = Number(longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -1019,6 +1145,8 @@ async function sendWhatsAppLocation(to, { latitude, longitude, name = "", addres
       address: address || undefined,
     },
   });
+
+  webhookLog("sendWhatsAppLocation.ok", { to: String(to), reportSource });
 }
 
 async function sendWhatsAppMediaById(to, type, mediaId, { caption = "", filename = "" } = {}, reportSource = "BOT") {
@@ -1652,18 +1780,59 @@ function getAnyTourByKey(key) {
   return getRealTourByKey(key) || getTourByKey(key);
 }
 
+function previewForLog(value, max = 160) {
+  const raw = String(value || "").replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  return raw.length > max ? `${raw.slice(0, max)}…` : raw;
+}
+
+function webhookLog(stage, data = undefined) {
+  if (!DEBUG_WEBHOOK) return;
+  const prefix = `[WEBHOOK][${new Date().toISOString()}] ${stage}`;
+  if (typeof data === "undefined") {
+    console.log(prefix);
+    return;
+  }
+  try {
+    console.log(prefix, JSON.stringify(data));
+  } catch {
+    console.log(prefix, data);
+  }
+}
+
 function verifyMetaSignature(req) {
-  if (!META_APP_SECRET) return true;
+  if (!META_APP_SECRET) {
+    webhookLog("verifyMetaSignature.skip", { reason: "META_APP_SECRET missing" });
+    return true;
+  }
+
   const signature = req.get("X-Hub-Signature-256");
-  if (!signature) return false;
+  if (!signature) {
+    webhookLog("verifyMetaSignature.fail", {
+      reason: "missing_signature_header",
+      rawBodyBytes: req.rawBody?.length || 0,
+    });
+    return false;
+  }
 
   const expected =
     "sha256=" +
     crypto.createHmac("sha256", META_APP_SECRET).update(req.rawBody || Buffer.from("")).digest("hex");
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch {
+    const ok = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    webhookLog(ok ? "verifyMetaSignature.ok" : "verifyMetaSignature.fail", {
+      reason: ok ? "matched" : "mismatch",
+      hasSignatureHeader: true,
+      rawBodyBytes: req.rawBody?.length || 0,
+    });
+    return ok;
+  } catch (err) {
+    webhookLog("verifyMetaSignature.fail", {
+      reason: "timing_safe_equal_error",
+      detail: err?.message || String(err),
+      rawBodyBytes: req.rawBody?.length || 0,
+    });
     return false;
   }
 }
@@ -1721,8 +1890,8 @@ function isGreeting(textNorm) {
 function quickHelpText() {
   return (
     `¡Hola! 😊\n` +
-    `Puedo ayudarte con *Actividades y parques temáticos*, *Boletos aéreos*, *Hoteles nacionales e internacionales*, *Cruceros*, *Ferries del Caribe*, *Seguros de viaje*, *Traslados* y *Paquetes internacionales y promociones*.\n\n` +
-    `También puedes escribirme ${formatVisibleRealTourGroupsInline()} para mostrarte las opciones disponibles.`
+    `Puedo ayudarte con *Hoteles nacionales e internacionales*, *Paquetes internacionales*, *Cruceros y Ferries del Caribe*, *Promociones*, *Daypass excursiones*, *Daypass resorts*, *Entradas parques temáticos y actividades*, *Seguros de viajes*, *Traslados* y *Boletos aéreos*.\n\n` +
+    `También puedes escribirme *"menú"* para ver todas las opciones disponibles.`
   );
 }
 
@@ -1889,14 +2058,19 @@ function waRowTitle(title, max = 24) {
 
 function serviceLineRowTitle(service) {
   const map = {
+    solo_hoteles: "Hoteles",
+    paquetes_vacacionales: "Paquetes intl.",
+    cruceros_ferries: "Cruceros/Ferries",
+    promociones: "Promociones",
+    daypass_excursiones: "Daypass excursiones",
+    daypass_resorts: "Daypass resorts",
+    parques_actividades: "Parques/actividades",
     tours_colombia: "Actividades",
     boletos_aereos: "Boletos aéreos",
-    solo_hoteles: "Hoteles",
-    seguros_viaje: "Seguros de viaje",
+    seguros_viaje: "Seguros de viajes",
     traslados: "Traslados",
     cruceros: "Cruceros",
     ferries_caribe: "Ferries del Caribe",
-    paquetes_vacacionales: "Paquetes y promos",
     hablar_asesor: "Hablar con asesor",
     ubicacion_contacto: "Ubicación/contacto",
     catalogo_pdf: "Catálogo PDF",
@@ -1951,29 +2125,55 @@ function detectServiceLineFromUser(text) {
   if (SERVICE_LINE_ID_TO_KEY[text]) return SERVICE_LINE_ID_TO_KEY[text];
 
   if (
-    t.includes("actividad") || t.includes("actividades") || t.includes("parque") || t.includes("parques") ||
-    t.includes("tematico") || t.includes("temático") || t.includes("daypass") ||
+    t.includes("hotel") || t.includes("hoteles") || t.includes("hospedaje") ||
+    t.includes("alojamiento") || t.includes("todo incluido") || t.includes("solo alojamiento")
+  ) return "solo_hoteles";
+
+  if (
+    t.includes("paquete internacional") || t.includes("paquetes internacionales") ||
+    t.includes("sin visa") || t.includes("visa americana") || t.includes("otros visados")
+  ) return "paquetes_vacacionales";
+
+  if (t.includes("promocion") || t.includes("promociones") || t.includes("promo")) return "promociones";
+
+  if (
+    t.includes("crucero") || t.includes("cruceros") || t.includes("ferry") ||
+    t.includes("ferries del caribe") || t.includes("royal caribbean") ||
+    t.includes("msc") || t.includes("norwegian") || t.includes("costa cruise")
+  ) return "cruceros_ferries";
+
+  if (
+    t.includes("daypass resort") || t.includes("daypass resorts") ||
+    t.includes("daypass hotel") || t.includes("daypass hoteles") ||
+    t.includes("resort daypass")
+  ) return "daypass_resorts";
+
+  if (
+    t.includes("daypass excursion") || t.includes("daypass excursiones")
+  ) return "daypass_excursiones";
+
+  if (
+    t.includes("parque tematico") || t.includes("parques tematicos") ||
+    t.includes("parque temático") || t.includes("parques temáticos") ||
+    t.includes("actividad") || t.includes("actividades") ||
     t.includes("scape park") || t.includes("bavaro adventure") || t.includes("bávaro adventure") ||
     t.includes("coco bongo") || t.includes("caribbean lake") || t.includes("domitai") ||
     t.includes("ocean world") || t.includes("dinner in the sky") || t.includes("panaca") ||
-    t.includes("hacienda park") || t.includes("boat party") || t.includes("nickelodeon") ||
-    t.includes("royalton") || t.includes("dreams dominicus") || t.includes("whala") ||
-    t.includes("juan dolio") || t.includes("boca chica") || t.includes("puerto plata")
-  ) {
-    return "tours_colombia";
-  }
+    t.includes("hacienda park") || t.includes("boat party")
+  ) return "parques_actividades";
 
   if (
-    t.includes("boleto") || t.includes("vuelo") || t.includes("vuelos") ||
+    t.includes("whala") || t.includes("juan dolio") || t.includes("boca chica") ||
+    t.includes("dreams dominicus") || t.includes("royalton") || t.includes("nickelodeon")
+  ) return "daypass_resorts";
+
+  if (
+    t.includes("boleto") || t.includes("vuelos") || t.includes("vuelo") ||
     t.includes("aereo") || t.includes("aéreo") || t.includes("aerolinea") || t.includes("aerolínea")
   ) return "boletos_aereos";
 
-  if (t.includes("hotel") || t.includes("hospedaje") || t.includes("alojamiento") || t.includes("resort")) return "solo_hoteles";
-  if (t.includes("crucero") || t.includes("cruceros") || t.includes("royal caribbean") || t.includes("msc") || t.includes("norwegian") || t.includes("costa cruise")) return "cruceros";
-  if (t.includes("ferry") || t.includes("ferries") || t.includes("ferries del caribe")) return "ferries_caribe";
   if (t.includes("seguro de viaje") || t.includes("seguros de viaje") || t.includes("seguro") || t.includes("asistencia de viaje")) return "seguros_viaje";
   if (t.includes("traslado") || t.includes("traslados") || t.includes("aeropuerto") || t.includes("transfer")) return "traslados";
-  if (t.includes("paquete internacional") || t.includes("paquetes internacionales") || t.includes("paquete") || t.includes("paquetes") || t.includes("destinos sin visa") || t.includes("destinos con visa")) return "paquetes_vacacionales";
   if (t.includes("asesor") || t.includes("agente") || t.includes("humano") || t.includes("persona")) return "hablar_asesor";
   if (t.includes("ubicacion") || t.includes("ubicación") || t.includes("direccion") || t.includes("dirección") || t.includes("contacto") || t.includes("oficina") || t.includes("horario") || t.includes("mitur")) return "ubicacion_contacto";
   if (detectCatalogRequest(t)) return "catalogo_pdf";
@@ -2017,7 +2217,8 @@ function detectPackageDestinationKeyFromUser(text, session = null) {
 
   if (t.includes("promociones disponibles") || t === "promociones" || t === "promocion" || t.includes("ver promociones")) return "__ver_promociones__";
   if (t.includes("sin visa")) return "destinos_sin_visa";
-  if (t.includes("con visa")) return "destinos_con_visa";
+  if (t.includes("visa americana")) return "destinos_con_visa_americana";
+  if (t.includes("otros visados") || t.includes("otro visado") || t.includes("visados")) return "otros_visados_asistencia";
   if (t.includes("hard rock")) return "hard_rock_punta_cana_mayo_2026";
   if (t.includes("lopesan")) return "lopesan_costa_bavaro_abril_2026";
   if (t.includes("sunscape") || t.includes("dominicus")) return "sunscape_dominicus_abril_2026";
@@ -2580,6 +2781,141 @@ function normalizeChildrenAgesInput(userText, expectedChildren = 0) {
   return { ok: false, formatted: "" };
 }
 
+
+function parseMenuOption(userText, options = []) {
+  const normalized = normalizeText(userText);
+  if (!normalized) return null;
+
+  if (/^\d+$/.test(normalized)) {
+    const idx = parseInt(normalized, 10) - 1;
+    if (idx >= 0 && idx < options.length) return options[idx];
+  }
+
+  for (const option of options) {
+    const titleNorm = normalizeText(option?.title || option?.label || option?.key || "");
+    const keyNorm = normalizeText(String(option?.key || "").replace(/_/g, " "));
+    if (normalized === titleNorm || normalized === keyNorm || normalized.includes(titleNorm) || normalized.includes(keyNorm)) {
+      return option;
+    }
+  }
+
+  return null;
+}
+
+function formatNumberedOptionsText(title, intro, options = []) {
+  return (
+    `${title}\n\n` +
+    `${intro}\n\n` +
+    options.map((item, idx) => `${idx + 1}. ${item.title}`).join("\n") +
+    `\n\nResponde con el *número* o el *nombre* de la opción.`
+  );
+}
+
+function getHotelProfileOptions(profileTitle = "", modeTitle = "") {
+  const profileKey = normalizeText(profileTitle).replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, "_");
+  const modeKey = normalizeText(modeTitle).includes("presupuesto") ? "por_presupuesto" : "por_polo";
+  if (modeKey === "por_presupuesto") {
+    if (profileKey.includes("solo_adultos") || profileKey.includes("solo adultos")) return HOTEL_BUDGET_OPTIONS.solo_adultos || [];
+    if (profileKey.includes("parque_acuatico") || profileKey.includes("parque acuatico")) return HOTEL_BUDGET_OPTIONS.parque_acuatico || [];
+    return HOTEL_BUDGET_OPTIONS.familiares || [];
+  }
+
+  if (profileKey.includes("solo_adultos") || profileKey.includes("solo adultos")) return HOTEL_POLO_OPTIONS.solo_adultos || [];
+  if (profileKey.includes("parque_acuatico") || profileKey.includes("parque acuatico")) return HOTEL_POLO_OPTIONS.parque_acuatico || [];
+  return HOTEL_POLO_OPTIONS.familiares || [];
+}
+
+function hotelNeedsBudgetPrompt(session) {
+  const scope = normalizeText(session?.pendingCategory || "");
+  const stayType = normalizeText(session?.pendingOrigin || "");
+  const searchMode = normalizeText(session?.pendingDepartureCity || "");
+  if (scope === "internacionales") return true;
+  if (stayType === "solo alojamiento") return true;
+  if (searchMode.includes("polo")) return true;
+  return !String(session?.pendingRange || "").trim();
+}
+
+function buildHotelLeadSummary(session, phoneDigits) {
+  const fields = [
+    { label: "🧩 Servicio", value: serviceLineLabel("solo_hoteles") },
+    { label: "🌍 Alcance", value: session.pendingCategory || "—" },
+  ];
+  if (session.pendingOrigin) fields.push({ label: "🏨 Modalidad", value: session.pendingOrigin });
+  if (session.pendingHotelStars) fields.push({ label: "👨‍👩‍👧 Perfil", value: session.pendingHotelStars });
+  if (session.pendingDepartureCity) fields.push({ label: "🗂️ Búsqueda", value: session.pendingDepartureCity });
+  if (session.pendingDestination) fields.push({ label: "📍 Zona / selección", value: session.pendingDestination });
+  fields.push({ label: "📅 Fecha deseada", value: session.pendingTravelDateText || "—" });
+  fields.push({ label: "👥 Pasajeros", value: `${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)} (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)` });
+  if (Number(session.pendingChildren || 0) > 0) fields.push({ label: "👶 Edades de niños", value: session.pendingChildrenAges || "No especificadas" });
+  fields.push({ label: "💵 Presupuesto", value: session.pendingNotes || session.pendingRange || "—" });
+  fields.push({ label: "👤 Cliente", value: session.pendingName || "—" });
+  fields.push({ label: "📱 WhatsApp", value: phoneDigits || "—" });
+  return buildLeadSummary("Nueva solicitud de hoteles nacionales e internacionales", fields);
+}
+
+async function finalizeHotelLead({ session, from }) {
+  const phoneDigits = String(from || "").replace(/[^\d]/g, "");
+  const summaryText = buildHotelLeadSummary(session, phoneDigits);
+  updateLead(session, { tour_key: "", quotePreview: summaryText, converted: false, followupSent: false });
+  await handoffToHumanTool({ summary: summaryText });
+  await notifyPersonalWhatsAppLeadSummary(summaryText, phoneDigits);
+
+  const agesLine = Number(session.pendingChildren || 0) > 0 ? `\n👶 Edades: ${session.pendingChildrenAges || "No especificadas"}` : "";
+  await sendWhatsAppText(
+    from,
+    `✅ *Solicitud recibida*\n\n` +
+      `🏨 Servicio: *Hoteles nacionales e internacionales*\n` +
+      `🌍 Alcance: *${session.pendingCategory || "—"}*\n` +
+      `${session.pendingOrigin ? `🛏️ Modalidad: *${session.pendingOrigin}*\n` : ""}` +
+      `${session.pendingHotelStars ? `👨‍👩‍👧 Perfil: *${session.pendingHotelStars}*\n` : ""}` +
+      `${session.pendingDepartureCity ? `🗂️ Búsqueda: *${session.pendingDepartureCity}*\n` : ""}` +
+      `${session.pendingDestination ? `📍 Selección: *${session.pendingDestination}*\n` : ""}` +
+      `📅 Fecha deseada: *${session.pendingTravelDateText || "—"}*\n` +
+      `👥 Pasajeros: *${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)}* (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)${agesLine}\n` +
+      `💵 Presupuesto: *${session.pendingNotes || session.pendingRange || "—"}*\n` +
+      `👤 Nombre: *${session.pendingName || "—"}*\n\n` +
+      `Te estaremos comunicando con un asesor para ayudarte con la búsqueda.`
+  );
+  clearIntakeFlow(session);
+}
+
+function buildCruiseFerryLeadSummary(session, phoneDigits) {
+  const fields = [
+    { label: "🧩 Servicio", value: serviceLineLabel("cruceros_ferries") },
+    { label: "🛳️ Tipo", value: session.pendingCategory || "—" },
+    { label: "📍 Ruta / destino", value: session.pendingDestination || "—" },
+    { label: "📅 Fecha deseada", value: session.pendingTravelDateText || "—" },
+    { label: "👥 Pasajeros", value: `${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)} (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)` },
+  ];
+  if (Number(session.pendingChildren || 0) > 0) fields.push({ label: "👶 Edades de niños", value: session.pendingChildrenAges || "No especificadas" });
+  fields.push({ label: "💵 Presupuesto", value: session.pendingRange || "—" });
+  fields.push({ label: "👤 Cliente", value: session.pendingName || "—" });
+  fields.push({ label: "📱 WhatsApp", value: phoneDigits || "—" });
+  return buildLeadSummary("Nueva solicitud de cruceros y ferries del Caribe", fields);
+}
+
+async function finalizeCruiseFerryLead({ session, from }) {
+  const phoneDigits = String(from || "").replace(/[^\d]/g, "");
+  const summaryText = buildCruiseFerryLeadSummary(session, phoneDigits);
+  updateLead(session, { tour_key: "", quotePreview: summaryText, converted: false, followupSent: false });
+  await handoffToHumanTool({ summary: summaryText });
+  await notifyPersonalWhatsAppLeadSummary(summaryText, phoneDigits);
+
+  const agesLine = Number(session.pendingChildren || 0) > 0 ? `\n👶 Edades: ${session.pendingChildrenAges || "No especificadas"}` : "";
+  await sendWhatsAppText(
+    from,
+    `✅ *Solicitud recibida*\n\n` +
+      `🛳️ Tipo: *${session.pendingCategory || "—"}*\n` +
+      `📍 Ruta / destino: *${session.pendingDestination || "—"}*\n` +
+      `📅 Fecha deseada: *${session.pendingTravelDateText || "—"}*\n` +
+      `👥 Pasajeros: *${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)}* (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)${agesLine}\n` +
+      `💵 Presupuesto: *${session.pendingRange || "—"}*\n` +
+      `👤 Nombre: *${session.pendingName || "—"}*\n\n` +
+      `Te estaremos comunicando con un asesor para continuar con la búsqueda.`
+  );
+  clearIntakeFlow(session);
+}
+
 function buildLeadSummary(title, fields = []) {
   const lines = [`📌 *${title}*`, ""];
   for (const f of fields) lines.push(`${f.label}: ${f.value || "—"}`);
@@ -2666,12 +3002,75 @@ async function startSimpleServiceFlow({ session, serviceLineKey, from }) {
   if (serviceLineKey === "paquetes_vacacionales") {
     session.state = "await_package_destination";
     session.packageMenuMode = "main";
-    await sendWhatsAppText(from, `Perfecto 🌍 Vamos con *paquetes internacionales y promociones*.
+    await sendWhatsAppText(from, `Perfecto 🌍 Vamos con *paquetes internacionales*.
 
-Selecciona una opción principal y luego te mostraré el detalle o las promociones disponibles.`);
+Selecciona una opción principal para continuar con la cotización.`);
     await sendPackageDestinationsList(from, session);
     return true;
   }
+
+  if (serviceLineKey === "promociones") {
+    session.state = "await_package_destination";
+    session.packageMenuMode = "promos";
+    await sendWhatsAppText(from, `Perfecto 🔥 Vamos con *promociones*.
+
+Aquí te muestro las promociones disponibles para que elijas la que deseas consultar.`);
+    await sendPackagePromotionsList(from, session);
+    return true;
+  }
+
+  if (serviceLineKey === "cruceros_ferries") {
+    session.state = "await_cruise_ferry_type";
+    await sendWhatsAppText(
+      from,
+      `🛳️ *Cruceros y Ferries del Caribe*\n\n` +
+        `Selecciona una opción:\n\n` +
+        CRUISE_FERRY_OPTIONS.map((item, idx) => `${idx + 1}. ${item.title}`).join("\n") +
+        `\n\nResponde con el *número* o el *nombre* de la opción.`
+    );
+    return true;
+  }
+
+  if (serviceLineKey === "daypass_excursiones") {
+    session.pendingRealTourGroup = "daypass_excursiones";
+    session.state = "await_real_tour_choice";
+    await sendWhatsAppText(from, `🌴 *Daypass excursiones*\n\nTe mostraré las opciones disponibles para que elijas la que deseas consultar.`);
+    await sendRealToursByGroup(from, "daypass_excursiones", session);
+    return true;
+  }
+
+  if (serviceLineKey === "daypass_resorts") {
+    session.pendingRealTourGroup = "daypass_resorts";
+    session.state = "await_real_tour_choice";
+    await sendWhatsAppText(from, `🏖️ *Daypass resorts*\n\nTe mostraré las opciones disponibles para que elijas la que deseas consultar.`);
+    await sendRealToursByGroup(from, "daypass_resorts", session);
+    return true;
+  }
+
+  if (serviceLineKey === "parques_actividades") {
+    session.state = "await_parks_activities_type";
+    await sendWhatsAppText(
+      from,
+      `🎟️ *Entradas parques temáticos y actividades 🇩🇴*\n\n` +
+        `Selecciona una opción:\n\n` +
+        PARKS_ACTIVITIES_OPTIONS.map((item, idx) => `${idx + 1}. ${item.title}`).join("\n") +
+        `\n\nResponde con el *número* o el *nombre* de la opción.`
+    );
+    return true;
+  }
+
+  if (serviceLineKey === "solo_hoteles") {
+    session.state = "await_hotel_scope_choice";
+    await sendWhatsAppText(
+      from,
+      `🏨 *Hoteles nacionales e internacionales*\n\n` +
+        `Selecciona una opción:\n\n` +
+        HOTEL_SCOPE_OPTIONS.map((item, idx) => `${idx + 1}. ${item.title}`).join("\n") +
+        `\n\nResponde con el *número* o el *nombre* de la opción.`
+    );
+    return true;
+  }
+
   const flow = SIMPLE_SERVICE_FLOWS.find((item) => item.serviceLineKey === serviceLineKey);
   if (!flow) return false;
   session.state = flow.startState;
@@ -2846,13 +3245,13 @@ Ahora dime tu *nombre completo*.` },
   {
     serviceLineKey: "paquetes_vacacionales",
     startState: "await_package_destination",
-    startPrompt: `Perfecto 🌍 Vamos con *paquetes internacionales y promociones*.
+    startPrompt: `Perfecto 🌍 Vamos con *paquetes internacionales*.
 
 Responde con el *número* o el *nombre* del paquete que te interesa.`,
     afterStart: async ({ from }) => {
       await sendPackageDestinationsList(from, session);
     },
-    summaryTitle: "Nueva solicitud de paquetes internacionales y promociones",
+    summaryTitle: "Nueva solicitud de paquetes internacionales",
     buildSummaryFields: (session, phoneDigits) => [
       { label: "🧩 Servicio", value: serviceLineLabel("paquetes_vacacionales") },
       { label: "🌍 Destino", value: session.pendingDestination || "—" },
@@ -2865,7 +3264,7 @@ Responde con el *número* o el *nombre* del paquete que te interesa.`,
     buildConfirmationText: (session) =>
       `✅ *Solicitud recibida*
 
-Recibí tu solicitud de *paquetes internacionales y promociones* y nuestro equipo te contactará con opciones según:
+Recibí tu solicitud de *paquetes internacionales* y nuestro equipo te contactará con opciones según:
 ` +
       `• destino: ${session.pendingDestination || "—"}
 ` +
@@ -2989,17 +3388,15 @@ Ahora dime tu *nombre completo*.` },
 
 function categoriesEmojiText() {
   return (
-    `🎢 *Actividades y parques temáticos*
+    `🎟️ *Entradas parques temáticos y actividades 🇩🇴*
 
 ` +
-    `Estas son las actividades y parques disponibles en esta versión del bot.
-` +
-    `Te mostraré el listado completo y puedes responder con el *número* o con el *nombre* de la opción que deseas ver.`
+    `Te mostraré el listado disponible y puedes responder con el *número* o con el *nombre* de la opción que deseas ver.`
   );
 }
 
 function mainMenuText() {
-  const visibleLines = SERVICE_LINES.filter(s => s.key !== "ubicacion_contacto");
+  const visibleLines = SERVICE_LINES.filter((s) => s.visible !== false);
   const listText = visibleLines.map(s => `• ${s.title}`).join("\n");
   return (
     `👋 ¡Bienvenido a *${BUSINESS_NAME}*! Soy tu asistente virtual de viajes.
@@ -3019,29 +3416,55 @@ function buildLocationContactText() {
   return (`📍 *Ubicación y contacto*\n\n` + `${addressLine}` + `${MARKET_CONTACT_TEXT}`).trim();
 }
 
+function getRealToursForContext(groupKey) {
+  const keySet = new Set();
+  if (groupKey === "daypass_resorts") {
+    DAYPASS_RESORT_TOUR_KEYS.forEach((key) => keySet.add(key));
+  } else if (groupKey === "daypass_excursiones") {
+    DAYPASS_EXCURSION_TOUR_KEYS.forEach((key) => keySet.add(key));
+  } else if (groupKey === "parques_tematicos_rd") {
+    PARKS_THEME_TOUR_KEYS.forEach((key) => keySet.add(key));
+  } else if (groupKey === "actividades_rd") {
+    ACTIVITIES_TOUR_KEYS.forEach((key) => keySet.add(key));
+  } else if (groupKey === "parques_actividades") {
+    [...PARKS_THEME_TOUR_KEYS, ...ACTIVITIES_TOUR_KEYS].forEach((key) => keySet.add(key));
+  } else {
+    return getRealToursByGroup(groupKey || "tours_colombia");
+  }
+
+  const orderedKeys = Array.from(keySet);
+  return orderedKeys.map((key) => getRealTourByKey(key)).filter(Boolean);
+}
+
 function getRealTourGroupIntro(groupKey) {
+  if (groupKey === "daypass_resorts") return "Estas son las opciones de daypass resorts disponibles con Terramarine.";
+  if (groupKey === "daypass_excursiones") return "Estas son las opciones de daypass excursiones disponibles con Terramarine.";
+  if (groupKey === "parques_tematicos_rd") return "Estas son las opciones de parques temáticos disponibles con Terramarine.";
+  if (groupKey === "actividades_rd") return "Estas son las actividades disponibles con Terramarine.";
+  if (groupKey === "parques_actividades") return "Estas son las entradas y actividades disponibles con Terramarine.";
   if (groupKey === "tours_colombia" || !groupKey) return "Estas son las actividades y parques temáticos disponibles con Terramarine.";
   return "Estas son las excursiones disponibles ahora mismo.";
 }
 
+function getRealTourListTitle(groupKey) {
+  if (groupKey === "daypass_resorts") return "🏖️ *Daypass resorts*";
+  if (groupKey === "daypass_excursiones") return "🌴 *Daypass excursiones*";
+  if (groupKey === "parques_tematicos_rd") return "🎟️ *Parques temáticos 🇩🇴*";
+  if (groupKey === "actividades_rd") return "🌴 *Actividades 🇩🇴*";
+  if (groupKey === "parques_actividades") return "🎟️ *Entradas parques temáticos y actividades 🇩🇴*";
+  return "🎢 *Actividades y parques temáticos*";
+}
+
 function formatRealToursTextList(groupKey, session) {
-  const tours = getRealToursByGroup(groupKey);
-  if (!tours.length) return "No encontré actividades disponibles ahora mismo 🙏";
+  const tours = getRealToursForContext(groupKey);
+  if (!tours.length) return "No encontré opciones disponibles ahora mismo 🙏";
   if (session) session.lastRealTours = tours.map((t) => ({ key: t.key, title: t.title }));
   return (
-    `🎢 *Actividades y parques temáticos*
-
-` +
-    `${getRealTourGroupIntro(groupKey)}
-
-` +
-    `Estas son las opciones disponibles:
-
-` +
+    `${getRealTourListTitle(groupKey)}\n\n` +
+    `${getRealTourGroupIntro(groupKey)}\n\n` +
+    `Estas son las opciones disponibles:\n\n` +
     tours.map((t, i) => `${i + 1}. ${t.title}`).join("\n") +
-`
-
-Responde con el *número* o con el *nombre* de la opción que deseas ver.`
+    `\n\nResponde con el *número* o con el *nombre* de la opción que deseas ver.`
   );
 }
 
@@ -3170,7 +3593,7 @@ function buildRealTourLeadSummary(session, phoneDigits) {
   const pax = Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0);
   const dateMeta = getRequestedDateMeta(session.pendingDesiredDate);
   const fields = [
-    { label: "🧩 Servicio", value: "Actividades y parques temáticos" },
+    { label: "🧩 Servicio", value: serviceLineLabel(session.pendingServiceLine || "tours_colombia") },
     { label: "🎢 Actividad", value: tour?.title || "—" },
     { label: "📅 Fecha solicitada", value: dateMeta.display || session.pendingDesiredDate || "—" },
     { label: "👥 Pasajeros", value: `${pax} (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)` }
@@ -3179,13 +3602,19 @@ function buildRealTourLeadSummary(session, phoneDigits) {
   fields.push({ label: "👤 Cliente", value: session.pendingName || "—" });
   fields.push({ label: "📱 WhatsApp", value: phoneDigits || "—" });
   fields.push({ label: "🖼️ Imagen", value: tour?.imageUrl || "—" });
-  return buildLeadSummary("Nueva solicitud de actividad o parque", fields);
+  return buildLeadSummary(`Nueva solicitud de ${serviceLineLabel(session.pendingServiceLine || "tours_colombia").toLowerCase()}`, fields);
 }
 
 // =========================
 // WhatsApp send helpers
 // =========================
 async function sendWhatsAppText(to, text, reportSource = "BOT") {
+  webhookLog("sendWhatsAppText.start", {
+    to: String(to),
+    reportSource,
+    length: String(text || "").length,
+    preview: previewForLog(text, 180),
+  });
   const url = `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`;
   await axios.post(
     url,
@@ -3199,6 +3628,12 @@ async function sendWhatsAppText(to, text, reportSource = "BOT") {
     body: String(text),
     source: reportSource,
     kind: "TEXT",
+  });
+
+  webhookLog("sendWhatsAppText.ok", {
+    to: String(to),
+    reportSource,
+    length: String(text || "").length,
   });
 }
 
@@ -3368,7 +3803,7 @@ async function sendInteractiveList(to, { header, body, button, sectionTitle, row
 
 async function sendServiceLinesList(to) {
   const rows = SERVICE_LINES
-    .filter((s) => s.key !== "ubicacion_contacto")
+    .filter((s) => s.visible !== false)
     .map((s) => ({ id: s.id, title: serviceLineRowTitle(s), description: "" }));
   await sendInteractiveList(to, {
     header: "Servicios disponibles",
@@ -3402,18 +3837,20 @@ async function sendPackagePresentation(to, pkg) {
 
 function buildPackageLeadSummary(session, phoneDigits) {
   const pkg = getPackageDestinationByKey(session.pendingDestination);
-  const adults = Math.max(Number(session.pendingPassengers || 0) - Number(session.pendingChildren || 0), 0);
+  const serviceTitle = serviceLineLabel(session.pendingServiceLine || "paquetes_vacacionales");
   const fields = [
-    { label: "🧩 Servicio", value: "Paquetes internacionales y promociones" },
-    { label: "🎒 Paquete", value: pkg?.title || session.pendingDestination || "—" },
-    { label: "📅 Fecha de interés", value: session.pendingTravelDateText || "—" },
-    { label: "👥 Pasajeros", value: `${session.pendingPassengers || 0} (${adults} adultos / ${session.pendingChildren || 0} niños)` },
-    { label: "👤 Cliente", value: session.pendingName || "—" },
-    { label: "📱 WhatsApp", value: phoneDigits || "—" },
+    { label: "🧩 Servicio", value: serviceTitle },
+    { label: "🌍 Opción", value: pkg?.title || session.pendingDestination || "—" },
   ];
+  if (String(session.pendingNotes || "").trim()) fields.push({ label: "📌 Destino de interés", value: session.pendingNotes });
+  fields.push({ label: "📅 Fecha de interés", value: session.pendingTravelDateText || "—" });
+  fields.push({ label: "👥 Pasajeros", value: `${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)} (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)` });
   if (Number(session.pendingChildren || 0) > 0) fields.push({ label: "👶 Edades de niños", value: session.pendingChildrenAges || "No especificadas" });
+  fields.push({ label: "💵 Presupuesto", value: session.pendingRange || "—" });
+  fields.push({ label: "👤 Cliente", value: session.pendingName || "—" });
+  fields.push({ label: "📱 WhatsApp", value: phoneDigits || "—" });
   fields.push({ label: "🖼️ Imagen", value: pkg?.imageUrl || "—" });
-  return buildLeadSummary("Nueva solicitud de paquetes internacionales y promociones", fields);
+  return buildLeadSummary(`Nueva solicitud de ${serviceTitle.toLowerCase()}`, fields);
 }
 
 async function finalizePackageLead({ session, from }) {
@@ -3423,45 +3860,31 @@ async function finalizePackageLead({ session, from }) {
   await handoffToHumanTool({ summary: summaryText });
   await notifyPersonalWhatsAppLeadSummary(summaryText, contactPhone);
   const pkg = getPackageDestinationByKey(session.pendingDestination);
-  const adults = Math.max(Number(session.pendingPassengers || 0) - Number(session.pendingChildren || 0), 0);
-  const agesLine = Number(session.pendingChildren || 0) > 0 ? `
-👶 Edades: ${session.pendingChildrenAges || "No especificadas"}` : "";
-  await sendWhatsAppText(from,
-    `✅ *Solicitud de paquetes / promoción recibida*
-
-` +
-    `🌍 Opción: *${pkg?.title || session.pendingDestination || "—"}*
-` +
-    `📅 Fecha de interés: *${session.pendingTravelDateText || "—"}*
-` +
-    `👥 Pasajeros: *${session.pendingPassengers || 0}* (${adults} adultos / ${session.pendingChildren || 0} niños)${agesLine}
-
-` +
-    `Tu solicitud quedó registrada. Un asesor de Terramarine te contactará para confirmar disponibilidad y gestionar la reserva.`
+  const serviceTitle = serviceLineLabel(session.pendingServiceLine || "paquetes_vacacionales");
+  const agesLine = Number(session.pendingChildren || 0) > 0 ? `\n👶 Edades: ${session.pendingChildrenAges || "No especificadas"}` : "";
+  const interestLine = String(session.pendingNotes || "").trim() ? `\n📌 Destino de interés: *${session.pendingNotes}*` : "";
+  await sendWhatsAppText(
+    from,
+    `✅ *Solicitud recibida*\n\n` +
+      `🧩 Servicio: *${serviceTitle}*\n` +
+      `🌍 Opción: *${pkg?.title || session.pendingDestination || "—"}*${interestLine}\n` +
+      `📅 Fecha deseada: *${session.pendingTravelDateText || "—"}*\n` +
+      `👥 Pasajeros: *${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)}* (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)${agesLine}\n` +
+      `💵 Presupuesto: *${session.pendingRange || "—"}*\n` +
+      `👤 Nombre: *${session.pendingName || "—"}*\n\n` +
+      `Te estaremos comunicando con un asesor para continuar con la búsqueda y validar disponibilidad.`
   );
   clearIntakeFlow(session);
 }
 
-async function sendTourOriginsList(to) {
-  const rows = TOUR_ORIGINS.map((o) => ({ id: o.id, title: waRowTitle(o.title), description: "" }));
-  await sendInteractiveList(to, {
-    header: "Origen / salida",
-    body: "¿Desde dónde deseas salir? 👇",
-    button: "Elegir origen",
-    sectionTitle: "Salidas",
-    rows,
-  });
-}
-
 const PACKAGE_MAIN_MENU_OPTIONS = [
-  { key: "destinos_sin_visa", title: "Ver destinos sin visa" },
-  { key: "destinos_con_visa", title: "Ver destinos con visa" },
-  { key: "__ver_promociones__", title: "Ver promociones disponibles" },
-  { key: "otro_destino", title: "Solicitar una cotización personalizada" },
+  { key: "destinos_sin_visa", title: "Sin visa 🇩🇴" },
+  { key: "destinos_con_visa_americana", title: "Tengo visa Americana 🇺🇸" },
+  { key: "otros_visados_asistencia", title: "Se requiere otros visados, asistencia incluida 🌐" },
 ];
 
 function getPackagePromotionOptions() {
-  return PACKAGE_DESTINATIONS.filter((p) => !["destinos_sin_visa", "destinos_con_visa", "otro_destino"].includes(p.key));
+  return PACKAGE_DESTINATIONS.filter((p) => !["destinos_sin_visa", "destinos_con_visa_americana", "otros_visados_asistencia", "otro_destino"].includes(p.key));
 }
 
 function setPackageMenuOptions(session, options, mode = "main") {
@@ -3474,10 +3897,10 @@ function formatPackageDestinationsTextList(session) {
   const options = PACKAGE_MAIN_MENU_OPTIONS;
   setPackageMenuOptions(session, options, "main");
   return (
-    `🌍 *Paquetes internacionales y promociones*\n\n` +
+    `🌍 *Paquetes internacionales*\n\n` +
     `Selecciona una opción:\n\n` +
     options.map((p, i) => `${i + 1}. ${p.title}`).join("\n") +
-    `\n\nPuedes responder con el *número* o escribir el *nombre* de la opción.`
+    `\n\nResponde con el *número* o con el *nombre* de la opción que deseas consultar.`
   );
 }
 
@@ -3522,7 +3945,7 @@ async function sendCatalogDocument(to) {
   if (!CATALOG_DOCUMENT_URL) {
     await sendWhatsAppText(
       to,
-      `Todavía no tengo el documento cargado aquí 🙏\n\nMientras tanto, dime si buscas *Actividades y parques temáticos*, *Boletos aéreos*, *Hoteles nacionales e internacionales*, *Cruceros*, *Ferries del Caribe*, *Seguros de viaje*, *Traslados* o *Paquetes internacionales y promociones* y te ayudo por el flujo normal.`
+      `Todavía no tengo el documento cargado aquí 🙏\n\nMientras tanto, dime si buscas *Hoteles nacionales e internacionales*, *Paquetes internacionales*, *Cruceros y Ferries del Caribe*, *Promociones*, *Daypass excursiones*, *Daypass resorts*, *Entradas parques temáticos y actividades*, *Seguros de viajes*, *Traslados* o *Boletos aéreos* y te ayudo por el flujo normal.`
     );
     return;
   }
@@ -4166,7 +4589,7 @@ function tryPickSlotFromUserText(session, userText) {
 async function callOpenAI({ session, userText, userPhone, extraSystem = "" }) {
   if (!OPENAI_API_KEY) {
     const fallback =
-      `Puedo ayudarte con *Actividades y parques temáticos*, *Boletos aéreos*, *Hoteles nacionales e internacionales*, *Cruceros*, *Ferries del Caribe*, *Seguros de viaje*, *Traslados* y *Paquetes internacionales y promociones*.\n\n` +
+      `Puedo ayudarte con *Hoteles nacionales e internacionales*, *Paquetes internacionales*, *Cruceros y Ferries del Caribe*, *Promociones*, *Daypass excursiones*, *Daypass resorts*, *Entradas parques temáticos y actividades*, *Seguros de viajes*, *Traslados* y *Boletos aéreos*.\n\n` +
       `Escribe *"menú"* para ver las opciones.`;
     session.messages.push({ role: "assistant", content: fallback });
     return fallback;
@@ -4181,14 +4604,16 @@ async function callOpenAI({ session, userText, userPhone, extraSystem = "" }) {
     content: `
 Eres un asistente de WhatsApp de ${BUSINESS_NAME}.
 Servicios:
-- Actividades y parques temáticos
-- Boletos aéreos
 - Hoteles nacionales e internacionales
-- Cruceros
-- Ferries del Caribe
-- Seguros de viaje
+- Paquetes internacionales
+- Cruceros y Ferries del Caribe
+- Promociones
+- Daypass excursiones
+- Daypass resorts
+- Entradas parques temáticos y actividades
+- Seguros de viajes
 - Traslados
-- Paquetes internacionales y promociones
+- Boletos aéreos
 
 Reglas:
 - Responde corto, claro y orientado a convertir.
@@ -4427,7 +4852,17 @@ app.post("/webhook", async (req, res) => {
   let session = null;
 
   try {
-    if (!verifyMetaSignature(req)) return res.sendStatus(403);
+    webhookLog("incoming.request", {
+      object: req.body?.object || null,
+      entryCount: Array.isArray(req.body?.entry) ? req.body.entry.length : 0,
+      hasSignature256: !!req.get("X-Hub-Signature-256"),
+      rawBodyBytes: req.rawBody?.length || 0,
+    });
+
+    if (!verifyMetaSignature(req)) {
+      webhookLog("exit.invalid_signature", { status: 403 });
+      return res.sendStatus(403);
+    }
 
     const entry = req.body.entry?.[0];
     const change = entry?.changes?.[0];
@@ -4436,20 +4871,54 @@ app.post("/webhook", async (req, res) => {
     const incomingPhoneNumberId = String(value?.metadata?.phone_number_id || "").trim();
     const expectedPhoneNumberId = String(PHONE_NUMBER_ID || "").trim();
 
+    webhookLog("payload.summary", {
+      field: change?.field || null,
+      hasMessages: Array.isArray(value?.messages) && value.messages.length > 0,
+      hasStatuses: Array.isArray(value?.statuses) && value.statuses.length > 0,
+      incomingPhoneNumberId: incomingPhoneNumberId || null,
+      expectedPhoneNumberId: expectedPhoneNumberId || null,
+      from: value?.messages?.[0]?.from || null,
+      messageType: value?.messages?.[0]?.type || null,
+      contactName: value?.contacts?.[0]?.profile?.name || null,
+    });
+
     if (incomingPhoneNumberId && expectedPhoneNumberId && incomingPhoneNumberId !== expectedPhoneNumberId) {
+      webhookLog("exit.phone_number_mismatch", {
+        incomingPhoneNumberId,
+        expectedPhoneNumberId,
+      });
       return res.sendStatus(200);
     }
 
     const msg = value?.messages?.[0];
-    if (!msg) return res.sendStatus(200);
+    if (!msg) {
+      webhookLog("exit.no_message", {
+        field: change?.field || null,
+        hasStatuses: Array.isArray(value?.statuses) && value.statuses.length > 0,
+      });
+      return res.sendStatus(200);
+    }
 
     from = msg.from;
-    if (!from) return res.sendStatus(200);
+    if (!from) {
+      webhookLog("exit.no_from", { msgType: msg?.type || null, msgId: msg?.id || null });
+      return res.sendStatus(200);
+    }
 
     session = await getSession(from);
+    webhookLog("session.loaded", {
+      from,
+      state: session?.state || null,
+      greeted: !!session?.greeted,
+      conversationMode: session?.conversationMode || "bot",
+      lastMsgId: session?.lastMsgId || null,
+    });
 
     const msgId = msg?.id;
-    if (msgId && session.lastMsgId === msgId) return res.sendStatus(200);
+    if (msgId && session.lastMsgId === msgId) {
+      webhookLog("exit.duplicate_message", { from, msgId });
+      return res.sendStatus(200);
+    }
     if (msgId) session.lastMsgId = msgId;
 
     markUserActivity(session);
@@ -4458,7 +4927,21 @@ app.post("/webhook", async (req, res) => {
     const userTextRaw = preprocessed.userText;
     const userText = (userTextRaw || "").trim();
     const tNorm = normalizeText(userText);
-    if (!userText) return res.sendStatus(200);
+    webhookLog("message.preprocessed", {
+      from,
+      msgId: msg?.id || null,
+      msgType: msg?.type || null,
+      mediaKind: preprocessed?.mediaKind || null,
+      userText: previewForLog(userText, 220),
+    });
+    if (!userText) {
+      webhookLog("exit.empty_user_text", {
+        from,
+        msgType: msg?.type || null,
+        mediaKind: preprocessed?.mediaKind || null,
+      });
+      return res.sendStatus(200);
+    }
 
     session.lastInboundMediaKind = preprocessed.mediaKind || "";
     session.lastInboundMediaSummary = truncateText(preprocessed.mediaSummary || "", 1000);
@@ -4481,6 +4964,7 @@ app.post("/webhook", async (req, res) => {
     if (bothubInboundAck?.conversationId) session.hubConversationId = String(bothubInboundAck.conversationId);
 
     if (isHumanModeDisableCommand(tNorm)) {
+      webhookLog("flow.human_mode_disable", { from, state: session?.state || null });
       session.conversationMode = "bot";
       await saveSession(from, session);
       await sendWhatsAppText(from, "🤖 Listo. Reactivé el asistente virtual. Escribe *menú* para ver las opciones.");
@@ -4488,6 +4972,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     if (isHumanModeEnableCommand(tNorm)) {
+      webhookLog("flow.human_mode_enable", { from, state: session?.state || null });
       session.conversationMode = "human";
       await saveSession(from, session);
       await sendWhatsAppText(from, "👤 Perfecto. Dejo la conversación en modo humano para que continúe un asesor.");
@@ -4495,6 +4980,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     if (session.conversationMode === "human") {
+      webhookLog("exit.human_mode_active", { from, state: session?.state || null });
       await saveSession(from, session);
       return res.sendStatus(200);
     }
@@ -4527,14 +5013,20 @@ app.post("/webhook", async (req, res) => {
       tNorm.includes("seguro") ||
       tNorm.includes("paquete") ||
       tNorm.includes("hotel") ||
-      tNorm.includes("traslado");
+      tNorm.includes("traslado") ||
+      tNorm.includes("actividad") ||
+      tNorm.includes("parque") ||
+      tNorm.includes("crucero") ||
+      tNorm.includes("ferry");
 
     if (session.greeted && session.state === "idle" && isGreeting(tNorm) && !hasEarlyIntent) {
+      webhookLog("flow.quick_help", { from, state: session?.state || null, greeted: !!session?.greeted });
       await sendWhatsAppText(from, quickHelpText());
       return res.sendStatus(200);
     }
 
     if (!session.greeted && session.state === "idle" && isGreeting(tNorm) && !hasEarlyIntent) {
+      webhookLog("flow.first_greeting_menu", { from, state: session?.state || null });
       session.greeted = true;
       armMenuInactivityReminder(session);
       await sendWhatsAppText(from, mainMenuText());
@@ -4599,23 +5091,20 @@ app.post("/webhook", async (req, res) => {
         session.pendingCity = null;
         session.pendingName = null;
 
-        await sendWhatsAppText(
-          from,
-          `↩️ Perfecto. Volviste al listado de *actividades y parques temáticos*.`
-        );
-        await sendRealToursByGroup(from, "tours_colombia", session);
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al listado anterior.`);
+        await sendRealToursByGroup(from, session.pendingRealTourGroup || "tours_colombia", session);
         return res.sendStatus(200);
       }
 
       if (session.state === "await_real_tour_choice") {
         session.pendingRealTourKey = null;
         session.pendingDesiredDate = null;
-        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al listado de *actividades y parques temáticos*.`);
-        await sendRealTourGroupsList(from, session);
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al listado anterior.`);
+        await sendRealToursByGroup(from, session.pendingRealTourGroup || "tours_colombia", session);
         return res.sendStatus(200);
       }
 
-      if (session.state === "await_tour_group" || session.pendingServiceLine === "tours_colombia") {
+      if (session.state === "await_tour_group" || ["tours_colombia", "daypass_excursiones", "daypass_resorts", "parques_actividades"].includes(session.pendingServiceLine)) {
         clearIntakeFlow(session);
         armMenuInactivityReminder(session);
         await sendWhatsAppText(from, mainMenuText());
@@ -4623,12 +5112,45 @@ app.post("/webhook", async (req, res) => {
         return res.sendStatus(200);
       }
 
-      if (["await_package_destination", "await_package_name", "await_package_date", "await_package_people", "await_package_children", "await_package_children_ages"].includes(session.state)) {
+      if (["await_package_destination", "await_package_interest", "await_package_date", "await_package_adults", "await_package_children", "await_package_children_ages", "await_package_budget", "await_package_name"].includes(session.state)) {
+        const wasPromos = session.pendingServiceLine === "promociones" || session.packageMenuMode === "promos";
         clearIntakeFlow(session);
-        session.pendingServiceLine = "paquetes_vacacionales";
+        session.pendingServiceLine = wasPromos ? "promociones" : "paquetes_vacacionales";
         session.state = "await_package_destination";
-        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al listado de *paquetes vacacionales*. Responde con el *número* o el *nombre* del paquete que quieres ver.`);
-        await sendPackageDestinationsList(from, session);
+        session.packageMenuMode = wasPromos ? "promos" : "main";
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *${wasPromos ? "promociones" : "paquetes internacionales"}*.`);
+        if (session.packageMenuMode === "promos") {
+          await sendPackagePromotionsList(from, session);
+        } else {
+          await sendPackageDestinationsList(from, session);
+        }
+        return res.sendStatus(200);
+      }
+
+      if (["await_hotel_scope_choice", "await_hotel_national_type", "await_hotel_profile", "await_hotel_view_mode", "await_hotel_option_choice", "await_hotel_destination_custom", "await_hotel_date_custom", "await_hotel_adults_custom", "await_hotel_children_custom", "await_hotel_children_ages_custom", "await_hotel_budget_custom", "await_hotel_name_custom"].includes(session.state)) {
+        clearIntakeFlow(session);
+        session.pendingServiceLine = "solo_hoteles";
+        session.state = "await_hotel_scope_choice";
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *hoteles nacionales e internacionales*.`);
+        await sendWhatsAppText(from, formatNumberedOptionsText("🏨 *Hoteles nacionales e internacionales*", "Selecciona una opción:", HOTEL_SCOPE_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (["await_cruise_ferry_type", "await_cruise_ferry_route", "await_cruise_ferry_date", "await_cruise_ferry_adults", "await_cruise_ferry_children", "await_cruise_ferry_children_ages", "await_cruise_ferry_budget", "await_cruise_ferry_name"].includes(session.state)) {
+        clearIntakeFlow(session);
+        session.pendingServiceLine = "cruceros_ferries";
+        session.state = "await_cruise_ferry_type";
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *cruceros y ferries del Caribe*.`);
+        await sendWhatsAppText(from, formatNumberedOptionsText("🛳️ *Cruceros y Ferries del Caribe*", "Selecciona una opción:", CRUISE_FERRY_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (session.state === "await_parks_activities_type") {
+        clearIntakeFlow(session);
+        session.pendingServiceLine = "parques_actividades";
+        session.state = "await_parks_activities_type";
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *entradas parques temáticos y actividades*.`);
+        await sendWhatsAppText(from, formatNumberedOptionsText("🎟️ *Entradas parques temáticos y actividades 🇩🇴*", "Selecciona una opción:", PARKS_ACTIVITIES_OPTIONS));
         return res.sendStatus(200);
       }
 
@@ -4674,7 +5196,7 @@ Responde con el *número* o con el *nombre* exacto de la opción.`
 
       disableMenuInactivityReminder(session);
       session.pendingRealTourKey = pickedTour.key;
-      session.pendingRealTourGroup = pickedTour.groupKey;
+      session.pendingRealTourGroup = session.pendingRealTourGroup || pickedTour.groupKey;
       updateLead(session, {
         tour_key: pickedTour.key,
         quotePreview: "",
@@ -4813,10 +5335,13 @@ Ahora indícame tu *nombre completo*.`);
 
       const agesMsg = Number(session.pendingChildren || 0) > 0 ? `
 👶 Edades: ${session.pendingChildrenAges}` : "";
+      const realTourServiceTitle = serviceLineLabel(session.pendingServiceLine || "tours_colombia");
       await sendWhatsAppText(
         from,
-        `✅ *Solicitud de actividad / parque recibida*
+        `✅ *Solicitud recibida*
 
+` +
+          `🧩 Servicio: *${realTourServiceTitle}*
 ` +
           `🎢 Opción: *${tour?.title || "—"}*
 ` +
@@ -4831,6 +5356,312 @@ Ahora indícame tu *nombre completo*.`);
       );
 
       clearIntakeFlow(session);
+      return res.sendStatus(200);
+    }
+
+    // =========================
+    // CUSTOM HOTELS FLOW
+    // =========================
+    if (session.state === "await_hotel_scope_choice") {
+      const option = parseMenuOption(userText, HOTEL_SCOPE_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🏨 *Hoteles nacionales e internacionales*", "Selecciona una opción:", HOTEL_SCOPE_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingCategory = option.title;
+      if (option.key === "internacionales") {
+        session.pendingOrigin = "Asistencia con asesor";
+        session.pendingDepartureCity = "Búsqueda personalizada";
+        session.state = "await_hotel_destination_custom";
+        await sendWhatsAppText(from, `🌍 *Hoteles internacionales*\n\nTe estaremos comunicando con un asesor especializado para ayudarte con la búsqueda.\n\nAntes de continuar, indícame por favor el *destino o ciudad* que te interesa.`);
+      } else {
+        session.state = "await_hotel_national_type";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇩🇴 *Hoteles nacionales*", "Selecciona el tipo de estadía que deseas:", HOTEL_NATIONAL_STAY_OPTIONS));
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_national_type") {
+      const option = parseMenuOption(userText, HOTEL_NATIONAL_STAY_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇩🇴 *Hoteles nacionales*", "Selecciona el tipo de estadía que deseas:", HOTEL_NATIONAL_STAY_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingOrigin = option.title;
+      if (option.key === "solo_alojamiento") {
+        session.pendingDepartureCity = "Búsqueda personalizada";
+        session.state = "await_hotel_destination_custom";
+        await sendWhatsAppText(from, `🛏️ *Solo alojamiento*\n\nPara esta opción, te estaremos comunicando con un asesor.\n\nAntes de continuar, indícame por favor la *zona o destino* que deseas consultar.`);
+      } else {
+        session.state = "await_hotel_profile";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🍹 *Hoteles todo incluido*", "Selecciona el tipo de hotel que deseas ver:", HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS));
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_profile") {
+      const option = parseMenuOption(userText, HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🍹 *Hoteles todo incluido*", "Selecciona el tipo de hotel que deseas ver:", HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingHotelStars = option.title;
+      session.state = "await_hotel_view_mode";
+      await sendWhatsAppText(from, formatNumberedOptionsText("📍 *¿Cómo deseas ver las opciones?*", "Selecciona una opción:", HOTEL_VIEW_MODE_OPTIONS));
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_view_mode") {
+      const option = parseMenuOption(userText, HOTEL_VIEW_MODE_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("📍 *¿Cómo deseas ver las opciones?*", "Selecciona una opción:", HOTEL_VIEW_MODE_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingDepartureCity = option.title;
+      session.state = "await_hotel_option_choice";
+      await sendWhatsAppText(
+        from,
+        formatNumberedOptionsText(
+          option.key === "por_presupuesto" ? `💵 *${session.pendingHotelStars || "Hoteles"} por presupuesto*` : `📍 *${session.pendingHotelStars || "Hoteles"} por polo turístico*`,
+          "Selecciona una opción:",
+          getHotelProfileOptions(session.pendingHotelStars, option.title)
+        )
+      );
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_option_choice") {
+      const options = getHotelProfileOptions(session.pendingHotelStars, session.pendingDepartureCity);
+      const option = parseMenuOption(userText, options);
+      if (!option) {
+        await sendWhatsAppText(
+          from,
+          formatNumberedOptionsText(
+            normalizeText(session.pendingDepartureCity).includes("presupuesto") ? `💵 *${session.pendingHotelStars || "Hoteles"} por presupuesto*` : `📍 *${session.pendingHotelStars || "Hoteles"} por polo turístico*`,
+            "Selecciona una opción:",
+            options
+          )
+        );
+        return res.sendStatus(200);
+      }
+      if (normalizeText(session.pendingDepartureCity).includes("presupuesto")) {
+        session.pendingRange = option.title;
+      } else {
+        session.pendingDestination = option.title;
+      }
+      session.state = "await_hotel_date_custom";
+      await sendWhatsAppText(from, `Perfecto 🙌\n\nAhora indícame la *fecha deseada*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_destination_custom") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame el *destino o zona* que deseas consultar.`);
+        return res.sendStatus(200);
+      }
+      session.pendingDestination = userText;
+      session.state = "await_hotel_date_custom";
+      await sendWhatsAppText(from, `Perfecto 🙌\n\nAhora indícame la *fecha deseada*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_date_custom") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *fecha deseada* para continuar.`);
+        return res.sendStatus(200);
+      }
+      session.pendingTravelDateText = userText;
+      session.state = "await_hotel_adults_custom";
+      await sendWhatsAppText(from, `Perfecto 👍\n¿Cuántos *adultos* viajarían?`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_adults_custom") {
+      const count = parsePassengerCount(userText);
+      if (count === null || count < 1) {
+        await sendWhatsAppText(from, `Indícame cuántos *adultos* viajarían. Ej: 2`);
+        return res.sendStatus(200);
+      }
+      session.pendingAdults = count;
+      session.pendingPassengers = count;
+      session.state = "await_hotel_children_custom";
+      await sendWhatsAppText(from, `Gracias. Ahora dime cuántos *niños* viajarían. Si no van niños, responde *0*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_children_custom") {
+      const count = parsePassengerCount(userText);
+      if (count === null || count < 0) {
+        await sendWhatsAppText(from, `Indícame cuántos *niños* viajarían. Si no van niños, responde *0*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildren = count;
+      session.pendingPassengers = Number(session.pendingAdults || 0) + count;
+      if (count > 0) {
+        session.state = "await_hotel_children_ages_custom";
+        await sendWhatsAppText(from, count > 1 ? `Perfecto. Ahora indícame las *edades de los niños separadas por coma*.\nEj: 5, 8` : `Perfecto. Ahora indícame la *edad del niño*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildrenAges = "";
+      if (hotelNeedsBudgetPrompt(session)) {
+        session.state = "await_hotel_budget_custom";
+        await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la búsqueda.`);
+      } else {
+        session.state = "await_hotel_name_custom";
+        await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_children_ages_custom") {
+      const ages = normalizeChildrenAgesInput(userText, session.pendingChildren || 0);
+      if (!ages.ok) {
+        await sendWhatsAppText(from, `Por favor, envíame las *edades de los niños separadas por coma*.\nEj: 5, 8`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildrenAges = ages.formatted;
+      if (hotelNeedsBudgetPrompt(session)) {
+        session.state = "await_hotel_budget_custom";
+        await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la búsqueda.`);
+      } else {
+        session.state = "await_hotel_name_custom";
+        await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_budget_custom") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame tu *presupuesto aproximado*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingNotes = userText;
+      session.state = "await_hotel_name_custom";
+      await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_name_custom") {
+      if (tNorm.length < 3 || ["si", "sí", "ok", "listo"].includes(tNorm)) {
+        await sendWhatsAppText(from, `Por favor, envíame tu *nombre completo* 🙂`);
+        return res.sendStatus(200);
+      }
+      session.pendingName = userText;
+      await finalizeHotelLead({ session, from });
+      return res.sendStatus(200);
+    }
+
+    // =========================
+    // CUSTOM CRUISES / FERRIES FLOW
+    // =========================
+    if (session.state === "await_cruise_ferry_type") {
+      const option = parseMenuOption(userText, CRUISE_FERRY_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🛳️ *Cruceros y Ferries del Caribe*", "Selecciona una opción:", CRUISE_FERRY_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingCategory = option.title;
+      session.state = "await_cruise_ferry_route";
+      await sendWhatsAppText(from, `Perfecto 🙌\n\nAhora indícame la *ruta o destino de interés*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_cruise_ferry_route") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *ruta o destino de interés*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingDestination = userText;
+      session.state = "await_cruise_ferry_date";
+      await sendWhatsAppText(from, `Perfecto 👍\nAhora indícame la *fecha deseada*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_cruise_ferry_date") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *fecha deseada*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingTravelDateText = userText;
+      session.state = "await_cruise_ferry_adults";
+      await sendWhatsAppText(from, `Perfecto 👍\n¿Cuántos *adultos* viajarían?`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_cruise_ferry_adults") {
+      const count = parsePassengerCount(userText);
+      if (count === null || count < 1) {
+        await sendWhatsAppText(from, `Indícame cuántos *adultos* viajarían. Ej: 2`);
+        return res.sendStatus(200);
+      }
+      session.pendingAdults = count;
+      session.pendingPassengers = count;
+      session.state = "await_cruise_ferry_children";
+      await sendWhatsAppText(from, `Gracias. Ahora dime cuántos *niños* viajarían. Si no van niños, responde *0*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_cruise_ferry_children") {
+      const count = parsePassengerCount(userText);
+      if (count === null || count < 0) {
+        await sendWhatsAppText(from, `Indícame cuántos *niños* viajarían. Si no van niños, responde *0*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildren = count;
+      session.pendingPassengers = Number(session.pendingAdults || 0) + count;
+      if (count > 0) {
+        session.state = "await_cruise_ferry_children_ages";
+        await sendWhatsAppText(from, count > 1 ? `Perfecto. Ahora indícame las *edades de los niños separadas por coma*.\nEj: 5, 8` : `Perfecto. Ahora indícame la *edad del niño*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildrenAges = "";
+      session.state = "await_cruise_ferry_budget";
+      await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la búsqueda.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_cruise_ferry_children_ages") {
+      const ages = normalizeChildrenAgesInput(userText, session.pendingChildren || 0);
+      if (!ages.ok) {
+        await sendWhatsAppText(from, `Por favor, envíame las *edades de los niños separadas por coma*.\nEj: 5, 8`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildrenAges = ages.formatted;
+      session.state = "await_cruise_ferry_budget";
+      await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la búsqueda.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_cruise_ferry_budget") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame tu *presupuesto aproximado*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingRange = userText;
+      session.state = "await_cruise_ferry_name";
+      await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_cruise_ferry_name") {
+      if (tNorm.length < 3 || ["si", "sí", "ok", "listo"].includes(tNorm)) {
+        await sendWhatsAppText(from, `Por favor, envíame tu *nombre completo* 🙂`);
+        return res.sendStatus(200);
+      }
+      session.pendingName = userText;
+      await finalizeCruiseFerryLead({ session, from });
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_parks_activities_type") {
+      const option = parseMenuOption(userText, PARKS_ACTIVITIES_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🎟️ *Entradas parques temáticos y actividades 🇩🇴*", "Selecciona una opción:", PARKS_ACTIVITIES_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingRealTourGroup = option.key;
+      session.state = "await_real_tour_choice";
+      await sendRealToursByGroup(from, option.key, session);
       return res.sendStatus(200);
     }
 
@@ -4850,20 +5681,102 @@ Ahora indícame tu *nombre completo*.`);
       }
 
       if (packageKey === "__ver_promociones__") {
-        disableMenuInactivityReminder(session);
-        await sendWhatsAppText(from, `✨ *Promociones disponibles*
+        session.pendingServiceLine = "promociones";
+        session.packageMenuMode = "promos";
+        await sendWhatsAppText(from, `✨ *Promociones*
 
-Aquí te muestro las promociones actuales para que elijas la que deseas consultar.`);
+Aquí te muestro las promociones disponibles para que elijas la que deseas consultar.`);
         await sendPackagePromotionsList(from, session);
         return res.sendStatus(200);
       }
 
       disableMenuInactivityReminder(session);
       session.pendingDestination = packageKey;
-      session.state = "await_package_name";
       await sendPackagePresentation(from, getPackageDestinationByKey(packageKey));
-      await sendWhatsAppText(from, `Perfecto 🌍
-Ahora indícame tu *nombre completo*.`);
+      if (session.packageMenuMode === "promos") {
+        session.state = "await_package_date";
+        await sendWhatsAppText(from, `Perfecto 🌍\nAhora indícame la *fecha deseada* para esta promoción.`);
+      } else {
+        session.state = "await_package_interest";
+        await sendWhatsAppText(from, `Perfecto 🌍\nAhora indícame el *destino de interés*. Si todavía no lo tienes definido, escribe *por definir*.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_interest") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame el *destino de interés*. Si todavía no lo tienes definido, puedes escribir *por definir*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingNotes = userText;
+      session.state = "await_package_date";
+      await sendWhatsAppText(from, `Gracias. Ahora dime la *fecha deseada* para continuar.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_date") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *fecha deseada* para continuar.`);
+        return res.sendStatus(200);
+      }
+      session.pendingTravelDateText = userText;
+      session.state = "await_package_adults";
+      await sendWhatsAppText(from, `Perfecto 👍\n¿Cuántos *adultos* viajarían?`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_adults") {
+      const count = parsePassengerCount(userText);
+      if (count === null || count < 1) {
+        await sendWhatsAppText(from, `Por favor, indícame cuántos *adultos* viajarían. Ej: 2`);
+        return res.sendStatus(200);
+      }
+      session.pendingAdults = count;
+      session.pendingPassengers = count;
+      session.state = "await_package_children";
+      await sendWhatsAppText(from, `Gracias. Ahora dime cuántos *niños* viajarían. Si no van niños, responde *0*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_children") {
+      const count = parsePassengerCount(userText);
+      if (count === null || count < 0) {
+        await sendWhatsAppText(from, `Indícame cuántos *niños* viajarían. Si no van niños, responde *0*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildren = count;
+      session.pendingPassengers = Number(session.pendingAdults || 0) + count;
+      if (count > 0) {
+        session.state = "await_package_children_ages";
+        await sendWhatsAppText(from, count > 1 ? `Perfecto. Ahora indícame las *edades de los niños separadas por coma*.\nEj: 5, 8` : `Perfecto. Ahora indícame la *edad del niño*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildrenAges = "";
+      session.state = "await_package_budget";
+      await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la cotización.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_children_ages") {
+      const ages = normalizeChildrenAgesInput(userText, session.pendingChildren || 0);
+      if (!ages.ok) {
+        await sendWhatsAppText(from, `Por favor, envíame las *edades de los niños separadas por coma*.\nEj: 5, 8`);
+        return res.sendStatus(200);
+      }
+      session.pendingChildrenAges = ages.formatted;
+      session.state = "await_package_budget";
+      await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la cotización.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_budget") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame tu *presupuesto aproximado*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingRange = userText;
+      session.state = "await_package_name";
+      await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
       return res.sendStatus(200);
     }
 
@@ -4873,67 +5786,6 @@ Ahora indícame tu *nombre completo*.`);
         return res.sendStatus(200);
       }
       session.pendingName = userText;
-      session.state = "await_package_date";
-      await sendWhatsAppText(from, `Gracias. Ahora dime la *fecha de interés* para la opción o promoción.`);
-      return res.sendStatus(200);
-    }
-
-    if (session.state === "await_package_date") {
-      if (tNorm.length < 2) {
-        await sendWhatsAppText(from, `Por favor, indícame la *fecha de interés* para la opción.`);
-        return res.sendStatus(200);
-      }
-      session.pendingTravelDateText = userText;
-      session.state = "await_package_people";
-      await sendWhatsAppText(from, `Perfecto 👍
-¿Cuántas *personas* viajarían en total?`);
-      return res.sendStatus(200);
-    }
-
-    if (session.state === "await_package_people") {
-      const count = parsePassengerCount(userText);
-      if (count === null || count < 1) {
-        await sendWhatsAppText(from, `Por favor, indícame cuántas *personas* viajarían en total. Ej: 2`);
-        return res.sendStatus(200);
-      }
-      session.pendingPassengers = count;
-      session.state = "await_package_children";
-      await sendWhatsAppText(from, `Gracias. Ahora dime cuántos *niños* viajarían. Si no van niños, responde *0*.`);
-      return res.sendStatus(200);
-    }
-
-    if (session.state === "await_package_children") {
-      const count = parsePassengerCount(userText);
-      const totalPax = Number(session.pendingPassengers || 0);
-      if (count === null || count < 0) {
-        await sendWhatsAppText(from, `Indícame cuántos *niños* viajarían. Si no van niños, responde *0*.`);
-        return res.sendStatus(200);
-      }
-      if (count > totalPax) {
-        await sendWhatsAppText(from, `La cantidad de *niños* no puede ser mayor que el total de pasajeros. Inténtalo de nuevo 🙏`);
-        return res.sendStatus(200);
-      }
-      session.pendingChildren = count;
-      session.pendingAdults = Math.max(totalPax - count, 0);
-      if (count > 0) {
-        session.state = "await_package_children_ages";
-        await sendWhatsAppText(from, count > 1 ? `Perfecto. Ahora indícame las *edades de los niños separadas por coma*.
-Ej: 5, 8` : `Perfecto. Ahora indícame la *edad del niño*.`);
-        return res.sendStatus(200);
-      }
-      session.pendingChildrenAges = "";
-      await finalizePackageLead({ session, from });
-      return res.sendStatus(200);
-    }
-
-    if (session.state === "await_package_children_ages") {
-      const ages = normalizeChildrenAgesInput(userText, session.pendingChildren || 0);
-      if (!ages.ok) {
-        await sendWhatsAppText(from, `Por favor, envíame las *edades de los niños separadas por coma*.
-Ej: 5, 8`);
-        return res.sendStatus(200);
-      }
-      session.pendingChildrenAges = ages.formatted;
       await finalizePackageLead({ session, from });
       return res.sendStatus(200);
     }
@@ -4983,9 +5835,17 @@ Aquí tienes las *actividades y parques temáticos disponibles*.`);
       const tour = getRealTourByKey(directRealTourKey);
       clearIntakeFlow(session);
       disableMenuInactivityReminder(session);
-      session.pendingServiceLine = "tours_colombia";
-      await routeConversationToQueue({ session, phone: from, queueName: HUB_QUEUE_SERVICE_TOURS, reason: "tours_colombia" });
-      session.pendingRealTourGroup = tour?.groupKey || null;
+      session.pendingServiceLine = DAYPASS_RESORT_TOUR_KEYS.includes(directRealTourKey)
+        ? "daypass_resorts"
+        : DAYPASS_EXCURSION_TOUR_KEYS.includes(directRealTourKey)
+          ? "daypass_excursiones"
+          : "parques_actividades";
+      await routeConversationToQueue({ session, phone: from, queueName: HUB_QUEUE_SERVICE_TOURS, reason: session.pendingServiceLine || "tours_colombia" });
+      session.pendingRealTourGroup = DAYPASS_RESORT_TOUR_KEYS.includes(directRealTourKey)
+        ? "daypass_resorts"
+        : DAYPASS_EXCURSION_TOUR_KEYS.includes(directRealTourKey)
+          ? "daypass_excursiones"
+          : tour?.groupKey || "parques_actividades";
       session.pendingRealTourKey = directRealTourKey;
       session.state = "await_real_tour_date";
       updateLead(session, { tour_key: directRealTourKey, quotePreview: "", converted: false, followupSent: false });
@@ -5000,9 +5860,9 @@ Aquí tienes las *actividades y parques temáticos disponibles*.`);
       disableMenuInactivityReminder(session);
       session.pendingServiceLine = serviceLineKey;
 
-      if (["tours_colombia", "boletos_aereos", "solo_hoteles", "cruceros", "ferries_caribe", "seguros_viaje", "traslados", "hablar_asesor"].includes(serviceLineKey)) {
+      if (["tours_colombia", "parques_actividades", "daypass_excursiones", "daypass_resorts", "boletos_aereos", "solo_hoteles", "cruceros", "ferries_caribe", "cruceros_ferries", "seguros_viaje", "traslados", "hablar_asesor"].includes(serviceLineKey)) {
         await routeConversationToQueue({ session, phone: from, queueName: HUB_QUEUE_SERVICE_TOURS, reason: serviceLineKey });
-      } else if (serviceLineKey === "paquetes_vacacionales") {
+      } else if (["paquetes_vacacionales", "promociones"].includes(serviceLineKey)) {
         await routeConversationToQueue({ session, phone: from, queueName: HUB_QUEUE_COMMERCIAL, reason: serviceLineKey });
       }
 
@@ -5049,6 +5909,12 @@ Aquí tienes las *actividades y parques temáticos disponibles*.`);
     await sendWhatsAppText(from, reply);
     return res.sendStatus(200);
   } catch (e) {
+    webhookLog("error.main_webhook", {
+      from: from || null,
+      state: session?.state || null,
+      conversationMode: session?.conversationMode || null,
+      detail: e?.response?.data || e?.message || String(e),
+    });
     console.error("Webhook error:", e?.response?.data || e?.message || e);
     try {
       if (from) {

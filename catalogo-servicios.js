@@ -3,16 +3,23 @@
 // =========================
 
 export const SERVICE_LINES = [
-  { key: "tours_colombia", id: "svc_actividades_parques", title: "🎢 Actividades y parques temáticos" },
-  { key: "boletos_aereos", id: "svc_boletos_aereos", title: "✈️ Boletos aéreos" },
-  { key: "solo_hoteles", id: "svc_hoteles", title: "🏨 Hoteles nacionales e internacionales" },
-  { key: "cruceros", id: "svc_cruceros", title: "🛳️ Cruceros" },
-  { key: "ferries_caribe", id: "svc_ferries_caribe", title: "⛴️ Ferries del Caribe" },
-  { key: "seguros_viaje", id: "svc_seguros_viaje", title: "🛡️ Seguros de viaje" },
-  { key: "traslados", id: "svc_traslados", title: "🚖 Traslados" },
-  { key: "paquetes_vacacionales", id: "svc_paquetes_internacionales", title: "🌍 Paquetes internacionales y promociones" },
-  { key: "hablar_asesor", id: "svc_hablar_asesor", title: "👤 Hablar con un asesor" },
-  { key: "ubicacion_contacto", id: "svc_ubicacion_contacto", title: "Ubicación y contacto" },
+  { key: "solo_hoteles", id: "svc_hoteles", title: "🏨 Hoteles nacionales e internacionales", visible: true },
+  { key: "paquetes_vacacionales", id: "svc_paquetes_internacionales", title: "🌍 Paquetes internacionales", visible: true },
+  { key: "cruceros_ferries", id: "svc_cruceros_ferries", title: "🛳️ Cruceros y Ferries del Caribe", visible: true },
+  { key: "promociones", id: "svc_promociones", title: "🔥 Promociones", visible: true },
+  { key: "daypass_excursiones", id: "svc_daypass_excursiones", title: "🌴 Daypass excursiones", visible: true },
+  { key: "daypass_resorts", id: "svc_daypass_resorts", title: "🏖️ Daypass resorts", visible: true },
+  { key: "parques_actividades", id: "svc_parques_actividades", title: "🎟️ Entradas parques temáticos y actividades 🇩🇴", visible: true },
+  { key: "seguros_viaje", id: "svc_seguros_viaje", title: "🛡️ Seguros de viajes", visible: true },
+  { key: "traslados", id: "svc_traslados", title: "🚖 Traslados", visible: true },
+  { key: "boletos_aereos", id: "svc_boletos_aereos", title: "✈️ Boletos aéreos", visible: true },
+
+  // Compatibilidad / accesos secundarios
+  { key: "tours_colombia", id: "svc_actividades_parques", title: "🎢 Actividades y parques temáticos", visible: false },
+  { key: "cruceros", id: "svc_cruceros", title: "🛳️ Cruceros", visible: false },
+  { key: "ferries_caribe", id: "svc_ferries_caribe", title: "⛴️ Ferries del Caribe", visible: false },
+  { key: "hablar_asesor", id: "svc_hablar_asesor", title: "👤 Hablar con un asesor", visible: false },
+  { key: "ubicacion_contacto", id: "svc_ubicacion_contacto", title: "Ubicación y contacto", visible: false },
 ];
 
 export const SERVICE_LINE_ID_TO_KEY = Object.fromEntries(SERVICE_LINES.map((s) => [s.id, s.key]));
@@ -30,7 +37,7 @@ export const PACKAGE_DESTINATIONS = [
   {
     key: "destinos_sin_visa",
     id: "pkg_destinos_sin_visa",
-    title: "Destinos sin visa",
+    title: "Sin visa 🇩🇴",
     imageUrl: "",
     priceText: "Tarifa según destino, fecha y cantidad de pasajeros.",
     dateText: "Disponible todo el año según promoción y cupo.",
@@ -38,14 +45,24 @@ export const PACKAGE_DESTINATIONS = [
     noteText: "Indícanos el destino, la fecha y cuántas personas viajan para prepararte la mejor opción.",
   },
   {
-    key: "destinos_con_visa",
-    id: "pkg_destinos_con_visa",
-    title: "Destinos con visa",
+    key: "destinos_con_visa_americana",
+    id: "pkg_destinos_con_visa_americana",
+    title: "Tengo visa Americana 🇺🇸",
     imageUrl: "",
     priceText: "Tarifa según destino, fecha, documentación y disponibilidad.",
     dateText: "Disponible todo el año según promoción y cupo.",
-    includesText: "Cotización personalizada de paquetes internacionales a destinos que requieren visa, ajustando vuelos, hotel y servicios complementarios según tu caso.",
+    includesText: "Cotización personalizada de paquetes internacionales a destinos que aprovechan visa americana vigente, ajustando vuelos, hotel y servicios complementarios.",
     noteText: "La documentación y requisitos migratorios se validan al momento de la solicitud.",
+  },
+  {
+    key: "otros_visados_asistencia",
+    id: "pkg_otros_visados_asistencia",
+    title: "Se requiere otros visados, asistencia incluida 🌐",
+    imageUrl: "",
+    priceText: "Tarifa según destino, fecha, documentación y disponibilidad.",
+    dateText: "Disponible bajo solicitud.",
+    includesText: "Cotización personalizada para destinos que requieren visados adicionales, con orientación de Terramarine sobre el proceso y servicios complementarios.",
+    noteText: "La asistencia de documentación se valida según el destino y requisitos migratorios vigentes.",
   },
   {
     key: "hard_rock_punta_cana_mayo_2026",
