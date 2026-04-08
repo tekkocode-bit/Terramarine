@@ -3,7 +3,11 @@
 // =========================
 
 export const REAL_TOUR_GROUPS = [
-  { key: "tours_colombia", id: "rtg_actividades_rd", title: "Actividades y parques temáticos" },
+  { key: "tours_colombia", id: "rtg_actividades_rd", title: "Actividades y parques temáticos", hidden: true },
+  { key: "daypass_excursiones", id: "rtg_daypass_excursiones", title: "Daypass excursiones", hidden: true },
+  { key: "daypass_resorts", id: "rtg_daypass_resorts", title: "Daypass resorts", hidden: true },
+  { key: "parques_tematicos_rd", id: "rtg_parques_tematicos_rd", title: "Parques temáticos", hidden: true },
+  { key: "actividades_rd", id: "rtg_actividades_rd_detalle", title: "Actividades", hidden: true },
 ];
 
 export const REAL_TOUR_GROUP_ID_TO_KEY = Object.fromEntries(
@@ -12,27 +16,27 @@ export const REAL_TOUR_GROUP_ID_TO_KEY = Object.fromEntries(
 
 export function buildRealToursCatalog() {
   return [
-    { key: "scape_park", id: "rt_scape_park", title: "Scape Park", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "bavaro_adventure_park", id: "rt_bavaro_adventure_park", title: "Bávaro Adventure Park", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "coco_bongo", id: "rt_coco_bongo", title: "Coco Bongo", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "caribbean_lake_park", id: "rt_caribbean_lake_park", title: "Caribbean Lake Park", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "domitai_park", id: "rt_domitai_park", title: "Domitai Park", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "ocean_world", id: "rt_ocean_world", title: "Ocean World", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "dinner_in_the_sky", id: "rt_dinner_in_the_sky", title: "Dinner in the Sky", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "panaca", id: "rt_panaca", title: "Panaca", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "hacienda_park", id: "rt_hacienda_park", title: "Hacienda Park", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "boat_party", id: "rt_boat_party", title: "Boat Party", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "whala_boca_chica_daypass", id: "rt_whala_boca_chica_daypass", title: "WHALA! Boca Chica Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "hodelpa_garden_suite_daypass", id: "rt_hodelpa_garden_suite_daypass", title: "Hodelpa Garden Suite Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "emotions_juan_dolio_daypass", id: "rt_emotions_juan_dolio_daypass", title: "Emotions Juan Dolio Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "coral_costa_caribe_daypass", id: "rt_coral_costa_caribe_daypass", title: "Coral Costa Caribe Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "dreams_dominicus_daypass", id: "rt_dreams_dominicus_daypass", title: "Dreams Dominicus Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "whala_bavaro_daypass", id: "rt_whala_bavaro_daypass", title: "WHALA! Bávaro Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "nickelodeon_daypass", id: "rt_nickelodeon_daypass", title: "Nickelodeon Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "royalton_splash_daypass", id: "rt_royalton_splash_daypass", title: "Royalton Splash Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "royalton_bavaro_daypass", id: "rt_royalton_bavaro_daypass", title: "Royalton Bávaro Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "royalton_chic_daypass", id: "rt_royalton_chic_daypass", title: "Royalton CHIC Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
-    { key: "emotions_puerto_plata_daypass", id: "rt_emotions_puerto_plata_daypass", title: "Emotions Puerto Plata Daypass", groupKey: "tours_colombia", imageUrl: "", leadOnly: true },
+    { key: "scape_park", id: "rt_scape_park", title: "Scape Park", groupKey: "parques_tematicos_rd", imageUrl: "", leadOnly: true },
+    { key: "bavaro_adventure_park", id: "rt_bavaro_adventure_park", title: "Bávaro Adventure Park", groupKey: "parques_tematicos_rd", imageUrl: "", leadOnly: true },
+    { key: "coco_bongo", id: "rt_coco_bongo", title: "Coco Bongo", groupKey: "actividades_rd", imageUrl: "", leadOnly: true },
+    { key: "caribbean_lake_park", id: "rt_caribbean_lake_park", title: "Caribbean Lake Park", groupKey: "parques_tematicos_rd", imageUrl: "", leadOnly: true },
+    { key: "domitai_park", id: "rt_domitai_park", title: "Domitai Park", groupKey: "parques_tematicos_rd", imageUrl: "", leadOnly: true },
+    { key: "ocean_world", id: "rt_ocean_world", title: "Ocean World", groupKey: "parques_tematicos_rd", imageUrl: "", leadOnly: true },
+    { key: "dinner_in_the_sky", id: "rt_dinner_in_the_sky", title: "Dinner in the Sky", groupKey: "actividades_rd", imageUrl: "", leadOnly: true },
+    { key: "panaca", id: "rt_panaca", title: "Panaca", groupKey: "parques_tematicos_rd", imageUrl: "", leadOnly: true },
+    { key: "hacienda_park", id: "rt_hacienda_park", title: "Hacienda Park", groupKey: "parques_tematicos_rd", imageUrl: "", leadOnly: true },
+    { key: "boat_party", id: "rt_boat_party", title: "Boat Party", groupKey: "actividades_rd", imageUrl: "", leadOnly: true },
+    { key: "whala_boca_chica_daypass", id: "rt_whala_boca_chica_daypass", title: "WHALA! Boca Chica Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "hodelpa_garden_suite_daypass", id: "rt_hodelpa_garden_suite_daypass", title: "Hodelpa Garden Suite Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "emotions_juan_dolio_daypass", id: "rt_emotions_juan_dolio_daypass", title: "Emotions Juan Dolio Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "coral_costa_caribe_daypass", id: "rt_coral_costa_caribe_daypass", title: "Coral Costa Caribe Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "dreams_dominicus_daypass", id: "rt_dreams_dominicus_daypass", title: "Dreams Dominicus Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "whala_bavaro_daypass", id: "rt_whala_bavaro_daypass", title: "WHALA! Bávaro Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "nickelodeon_daypass", id: "rt_nickelodeon_daypass", title: "Nickelodeon Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "royalton_splash_daypass", id: "rt_royalton_splash_daypass", title: "Royalton Splash Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "royalton_bavaro_daypass", id: "rt_royalton_bavaro_daypass", title: "Royalton Bávaro Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "royalton_chic_daypass", id: "rt_royalton_chic_daypass", title: "Royalton CHIC Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
+    { key: "emotions_puerto_plata_daypass", id: "rt_emotions_puerto_plata_daypass", title: "Emotions Puerto Plata Daypass", groupKey: "daypass_resorts", imageUrl: "", leadOnly: true },
   ];
 }
 

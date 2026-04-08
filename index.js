@@ -1766,7 +1766,7 @@ function formatVisibleRealTourGroupsInline() {
 }
 
 function getRealTourGroupEmoji(groupKey) {
-  const map = { tours_colombia: "🎢" };
+  const map = { tours_colombia: "🎢", daypass_excursiones: "🌴", daypass_resorts: "🏖️", parques_tematicos_rd: "🎟️", actividades_rd: "🌴" };
   return map[groupKey] || "🌴";
 }
 
@@ -2290,9 +2290,19 @@ function detectTourKeyFromUser(text) {
 function detectRealTourGroupFromUser(text, { allowBareOrigin = false } = {}) {
   const t = normalizeText(text);
   if (REAL_TOUR_GROUP_ID_TO_KEY[text]) return REAL_TOUR_GROUP_ID_TO_KEY[text];
-  if (t.includes("actividades") || t.includes("parques") || t.includes("parques tematicos") || t.includes("parques temáticos") || t.includes("daypass") || t === "actividades" || t === "parques" || (allowBareOrigin && (t === "rd" || t === "republica dominicana" || t === "república dominicana"))) {
+
+  if (
+    t === "actividades y parques tematicos" ||
+    t === "actividades y parques temáticos" ||
+    t === "actividades y parques" ||
+    t === "ver tours" ||
+    t === "categorias" ||
+    t === "categorías" ||
+    (allowBareOrigin && (t === "rd" || t === "republica dominicana" || t === "república dominicana"))
+  ) {
     return "tours_colombia";
   }
+
   return null;
 }
 
@@ -5821,12 +5831,19 @@ Aquí te muestro las promociones disponibles para que elijas la que deseas consu
     if (directRealTourGroup) {
       clearIntakeFlow(session);
       disableMenuInactivityReminder(session);
-      session.pendingServiceLine = "tours_colombia";
+      session.pendingServiceLine =
+        directRealTourGroup === "daypass_resorts"
+          ? "daypass_resorts"
+          : directRealTourGroup === "daypass_excursiones"
+            ? "daypass_excursiones"
+            : directRealTourGroup === "parques_tematicos_rd" || directRealTourGroup === "actividades_rd"
+              ? "parques_actividades"
+              : "tours_colombia";
       session.pendingRealTourGroup = directRealTourGroup;
       session.state = "await_real_tour_choice";
-      await sendWhatsAppText(from, `Perfecto 🎢
-Aquí tienes las *actividades y parques temáticos disponibles*.`);
-      await sendRealTourGroupsList(from, session);
+      await sendWhatsAppText(from, `Perfecto 🙌
+Aquí tienes las opciones disponibles.`);
+      await sendRealToursByGroup(from, directRealTourGroup, session);
       return res.sendStatus(200);
     }
 
