@@ -3877,27 +3877,75 @@ function buildRealTourLeadSummary(session, phoneDigits) {
   return buildLeadSummary(`Nueva solicitud de ${serviceLineLabel(session.pendingServiceLine || "tours_colombia").toLowerCase()}`, fields);
 }
 
+const NAVIGATION_HELP_TEXT = "↩️ Escribe *atrás* para volver a la opción anterior o *menú* para regresar al inicio.";
+const NAVIGATION_HELP_TEXT_COMPACT = "↩️ *Atrás* = anterior | *Menú* = inicio";
+
+function normalizedComparableText(value = "") {
+  return normalizeText(String(value || "")).replace(/\s+/g, " ").trim();
+}
+
+function isAdminNotificationTarget(to) {
+  const digits = String(to || "").replace(/[^\d]/g, "");
+  if (!digits) return false;
+  const adminTargets = new Set(
+    [ADMIN_WA_TO, PERSONAL_WA_TO]
+      .map((v) => String(v || "").replace(/[^\d]/g, ""))
+      .filter(Boolean)
+  );
+  return adminTargets.has(digits);
+}
+
+function shouldAppendNavigationHelp(to, text, reportSource = "BOT") {
+  if (reportSource !== "BOT") return false;
+  if (isAdminNotificationTarget(to)) return false;
+
+  const raw = String(text || "").trim();
+  if (!raw) return false;
+
+  const norm = normalizedComparableText(raw);
+  if (!norm) return false;
+  if (norm === normalizedComparableText(mainMenuText())) return false;
+  if (norm.includes("atras") && norm.includes("menu")) return false;
+
+  return true;
+}
+
+function appendNavigationHelp(to, text, reportSource = "BOT") {
+  const raw = String(text || "");
+  if (!shouldAppendNavigationHelp(to, raw, reportSource)) return raw;
+
+  const extendedSuffix = `\n\n${NAVIGATION_HELP_TEXT}`;
+  if ((raw + extendedSuffix).length <= 4096) return raw + extendedSuffix;
+
+  const compactSuffix = `\n\n${NAVIGATION_HELP_TEXT_COMPACT}`;
+  if ((raw + compactSuffix).length <= 4096) return raw + compactSuffix;
+
+  return raw;
+}
+
 // =========================
 // WhatsApp send helpers
 // =========================
 async function sendWhatsAppText(to, text, reportSource = "BOT") {
+  const finalText = appendNavigationHelp(to, text, reportSource);
+
   webhookLog("sendWhatsAppText.start", {
     to: String(to),
     reportSource,
-    length: String(text || "").length,
-    preview: previewForLog(text, 180),
+    length: String(finalText || "").length,
+    preview: previewForLog(finalText, 180),
   });
   const url = `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`;
   await axios.post(
     url,
-    { messaging_product: "whatsapp", to, type: "text", text: { body: text } },
+    { messaging_product: "whatsapp", to, type: "text", text: { body: finalText } },
     { headers: { Authorization: `Bearer ${WA_TOKEN}` } }
   );
 
   await bothubReportMessage({
     direction: "OUTBOUND",
     to: String(to),
-    body: String(text),
+    body: String(finalText),
     source: reportSource,
     kind: "TEXT",
   });
@@ -3905,7 +3953,7 @@ async function sendWhatsAppText(to, text, reportSource = "BOT") {
   webhookLog("sendWhatsAppText.ok", {
     to: String(to),
     reportSource,
-    length: String(text || "").length,
+    length: String(finalText || "").length,
   });
 }
 
