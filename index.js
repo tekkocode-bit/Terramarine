@@ -82,8 +82,25 @@ const HOTEL_SCOPE_OPTIONS = [
 ];
 
 const HOTEL_NATIONAL_STAY_OPTIONS = [
-  { key: "solo_alojamiento", title: "Solo alojamiento" },
   { key: "todo_incluido", title: "Todo incluido" },
+  { key: "solo_alojamiento", title: "Alojamiento" },
+];
+
+const HOTEL_INTERNATIONAL_STAY_OPTIONS = [
+  { key: "solo_alojamiento", title: "Alojamiento" },
+  { key: "todo_incluido", title: "Todo incluido" },
+];
+
+const HOTEL_INTL_ALL_INCLUSIVE_DESTINATION_OPTIONS = [
+  { key: "aruba", title: "Aruba" },
+  { key: "cuba", title: "Cuba" },
+  { key: "curacao", title: "Curaçao" },
+  { key: "espana", title: "España" },
+  { key: "jamaica", title: "Jamaica" },
+  { key: "maldivas", title: "Maldivas" },
+  { key: "mexico_cancun", title: "México (Cancún)" },
+  { key: "las_vegas", title: "Las Vegas, Nevada, USA" },
+  { key: "otros", title: "Otros, especifique" },
 ];
 
 const HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS = [
@@ -149,6 +166,59 @@ const CRUISE_FERRY_OPTIONS = [
 const PARKS_ACTIVITIES_OPTIONS = [
   { key: "parques_tematicos_rd", title: "Parques temáticos" },
   { key: "actividades_rd", title: "Actividades" },
+];
+
+const HOTEL_ZONE_OPTIONS = [
+  { key: "no", title: "No" },
+  { key: "si", title: "Sí, especificar" },
+];
+
+const FLIGHT_TYPE_OPTIONS = [
+  { key: "ida_vuelta", title: "Ida y vuelta" },
+  { key: "solo_ida", title: "Solo ida" },
+  { key: "multiples_ciudades", title: "Múltiples ciudades y/o países" },
+];
+
+const FLIGHT_SOLO_IDA_REQUIREMENT_OPTIONS = [
+  { key: "si", title: "Sí" },
+  { key: "no", title: "No" },
+  { key: "necesito_orientacion", title: "Necesito orientación" },
+];
+
+const BAGGAGE_OPTIONS = [
+  { key: "no", title: "No" },
+  { key: "si", title: "Sí" },
+];
+
+const BAGGAGE_TYPE_OPTIONS = [
+  { key: "maleta_mano", title: "1 maleta de mano" },
+  { key: "maleta_bodega", title: "1 maleta en bodega" },
+  { key: "mano_y_bodega", title: "1 maleta de mano y 1 en bodega" },
+];
+
+const PROMOTION_MAIN_OPTIONS = [
+  { key: "resorts", title: "Resorts" },
+];
+
+const PROMOTION_RESORT_OPTIONS = [
+  { key: "individuales", title: "Individuales" },
+  { key: "grupos", title: "Grupos" },
+];
+
+const PROMOTION_MONTH_OPTIONS = [
+  { key: "mayo", title: "Mayo" },
+  { key: "junio", title: "Junio" },
+  { key: "julio", title: "Julio" },
+  { key: "agosto", title: "Agosto" },
+  { key: "septiembre", title: "Septiembre" },
+  { key: "octubre", title: "Octubre" },
+  { key: "noviembre", title: "Noviembre" },
+  { key: "diciembre", title: "Diciembre" },
+];
+
+const PROMOTION_GROUP_OPTIONS = [
+  { key: "pequenos", title: "Pequeños +10 habs" },
+  { key: "regulares", title: "Regulares +20 habs" },
 ];
 
 const execFileAsync = promisify(execFile);
@@ -580,6 +650,17 @@ function clearIntakeFlow(session) {
   session.pendingNights = null;
   session.pendingTransferRoute = null;
   session.pendingAdvisorTopic = null;
+  session.pendingSpecificZone = null;
+  session.pendingZonePreference = null;
+  session.pendingFlightType = null;
+  session.pendingBaggage = null;
+  session.pendingBaggageType = null;
+  session.pendingMultiCitySegments = [];
+  session.pendingEmbassy = null;
+  session.pendingPromotionType = null;
+  session.pendingPromotionMonth = null;
+  session.pendingPromotionGroupType = null;
+  session.pendingPromotionScope = null;
 
   session.lastPackages = [];
   session.packageMenuMode = "main";
@@ -2839,10 +2920,11 @@ function hotelNeedsBudgetPrompt(session) {
   const scope = normalizeText(session?.pendingCategory || "");
   const stayType = normalizeText(session?.pendingOrigin || "");
   const searchMode = normalizeText(session?.pendingDepartureCity || "");
-  if (scope === "internacionales") return true;
-  if (stayType === "solo alojamiento") return true;
-  if (searchMode.includes("polo")) return true;
-  return !String(session?.pendingRange || "").trim();
+  const hasProfile = Boolean(normalizeText(session?.pendingHotelStars || ""));
+  if (scope !== "nacionales") return false;
+  if (stayType !== "todo incluido") return false;
+  if (!hasProfile) return false;
+  return searchMode.includes("polo");
 }
 
 function buildHotelLeadSummary(session, phoneDigits) {
@@ -2853,11 +2935,13 @@ function buildHotelLeadSummary(session, phoneDigits) {
   if (session.pendingOrigin) fields.push({ label: "🏨 Modalidad", value: session.pendingOrigin });
   if (session.pendingHotelStars) fields.push({ label: "👨‍👩‍👧 Perfil", value: session.pendingHotelStars });
   if (session.pendingDepartureCity) fields.push({ label: "🗂️ Búsqueda", value: session.pendingDepartureCity });
-  if (session.pendingDestination) fields.push({ label: "📍 Zona / selección", value: session.pendingDestination });
+  if (session.pendingDestination) fields.push({ label: "📍 Destino / selección", value: session.pendingDestination });
+  if (session.pendingSpecificZone) fields.push({ label: "📌 Zona específica", value: session.pendingSpecificZone });
   fields.push({ label: "📅 Fecha deseada", value: session.pendingTravelDateText || "—" });
   fields.push({ label: "👥 Pasajeros", value: `${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)} (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)` });
   if (Number(session.pendingChildren || 0) > 0) fields.push({ label: "👶 Edades de niños", value: session.pendingChildrenAges || "No especificadas" });
-  fields.push({ label: "💵 Presupuesto", value: session.pendingNotes || session.pendingRange || "—" });
+  if (session.pendingRange) fields.push({ label: "💵 Presupuesto / rango", value: session.pendingRange });
+  if (session.pendingNotes) fields.push({ label: "📝 Nota interna", value: session.pendingNotes });
   fields.push({ label: "👤 Cliente", value: session.pendingName || "—" });
   fields.push({ label: "📱 WhatsApp", value: phoneDigits || "—" });
   return buildLeadSummary("Nueva solicitud de hoteles nacionales e internacionales", fields);
@@ -2870,20 +2954,38 @@ async function finalizeHotelLead({ session, from }) {
   await handoffToHumanTool({ summary: summaryText });
   await notifyPersonalWhatsAppLeadSummary(summaryText, phoneDigits);
 
-  const agesLine = Number(session.pendingChildren || 0) > 0 ? `\n👶 Edades: ${session.pendingChildrenAges || "No especificadas"}` : "";
+  const agesLine = Number(session.pendingChildren || 0) > 0 ? `
+👶 Edades: ${session.pendingChildrenAges || "No especificadas"}` : "";
+  const zoneLine = session.pendingSpecificZone ? `
+📌 Zona específica: *${session.pendingSpecificZone}*` : "";
+  const budgetLine = session.pendingRange ? `
+💵 Presupuesto / rango: *${session.pendingRange}*` : "";
   await sendWhatsAppText(
     from,
-    `✅ *Solicitud recibida*\n\n` +
-      `🏨 Servicio: *Hoteles nacionales e internacionales*\n` +
-      `🌍 Alcance: *${session.pendingCategory || "—"}*\n` +
-      `${session.pendingOrigin ? `🛏️ Modalidad: *${session.pendingOrigin}*\n` : ""}` +
-      `${session.pendingHotelStars ? `👨‍👩‍👧 Perfil: *${session.pendingHotelStars}*\n` : ""}` +
-      `${session.pendingDepartureCity ? `🗂️ Búsqueda: *${session.pendingDepartureCity}*\n` : ""}` +
-      `${session.pendingDestination ? `📍 Selección: *${session.pendingDestination}*\n` : ""}` +
-      `📅 Fecha deseada: *${session.pendingTravelDateText || "—"}*\n` +
-      `👥 Pasajeros: *${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)}* (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)${agesLine}\n` +
-      `💵 Presupuesto: *${session.pendingNotes || session.pendingRange || "—"}*\n` +
-      `👤 Nombre: *${session.pendingName || "—"}*\n\n` +
+    `✅ *Solicitud recibida*
+
+` +
+      `🏨 Servicio: *Hoteles nacionales e internacionales*
+` +
+      `🌍 Alcance: *${session.pendingCategory || "—"}*
+` +
+      `${session.pendingOrigin ? `🛏️ Modalidad: *${session.pendingOrigin}*
+` : ""}` +
+      `${session.pendingHotelStars ? `👨‍👩‍👧 Perfil: *${session.pendingHotelStars}*
+` : ""}` +
+      `${session.pendingDepartureCity ? `🗂️ Búsqueda: *${session.pendingDepartureCity}*
+` : ""}` +
+      `${session.pendingDestination ? `📍 Destino / selección: *${session.pendingDestination}*` : `📍 Destino / selección: *—*`}` +
+      `${zoneLine}
+` +
+      `📅 Fecha deseada: *${session.pendingTravelDateText || "—"}*
+` +
+      `👥 Pasajeros: *${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)}* (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)${agesLine}` +
+      `${budgetLine}
+` +
+      `👤 Nombre: *${session.pendingName || "—"}*
+
+` +
       `Te estaremos comunicando con un asesor para ayudarte con la búsqueda.`
   );
   clearIntakeFlow(session);
@@ -2921,6 +3023,115 @@ async function finalizeCruiseFerryLead({ session, from }) {
       `👥 Pasajeros: *${Number(session.pendingAdults || 0) + Number(session.pendingChildren || 0)}* (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)${agesLine}\n` +
       `💵 Presupuesto: *${session.pendingRange || "—"}*\n` +
       `👤 Nombre: *${session.pendingName || "—"}*\n\n` +
+      `Te estaremos comunicando con un asesor para continuar con la búsqueda.`
+  );
+  clearIntakeFlow(session);
+}
+
+
+function buildFlightLeadSummary(session, phoneDigits) {
+  const itinerary = Array.isArray(session.pendingMultiCitySegments) && session.pendingMultiCitySegments.length
+    ? session.pendingMultiCitySegments.map((seg, idx) => `${idx + 1}. ${seg.destination} | ${seg.date}`).join(" ; ")
+    : "";
+  const fields = [
+    { label: "🧩 Servicio", value: serviceLineLabel("boletos_aereos") },
+    { label: "✈️ Modalidad", value: session.pendingFlightType || "—" },
+  ];
+  if (session.pendingVisaRequirement) fields.push({ label: "🛂 Requisito destino", value: session.pendingVisaRequirement });
+  if (itinerary) {
+    fields.push({ label: "🗺️ Itinerario", value: itinerary });
+  } else {
+    fields.push({ label: "🌍 Destino", value: session.pendingDestination || "—" });
+    fields.push({ label: "📅 Fecha de ida", value: session.pendingTravelDateText || "—" });
+    if (session.pendingTravelEndDateText) fields.push({ label: "↩️ Fecha de regreso", value: session.pendingTravelEndDateText });
+  }
+  fields.push({ label: "👥 Personas", value: session.pendingPassengers || "—" });
+  fields.push({ label: "🧳 Equipaje adicional", value: session.pendingBaggage || "No" });
+  if (session.pendingBaggageType) fields.push({ label: "🧳 Tipo de equipaje", value: session.pendingBaggageType });
+  fields.push({ label: "👤 Cliente", value: session.pendingName || "—" });
+  fields.push({ label: "📱 WhatsApp", value: phoneDigits || "—" });
+  return buildLeadSummary("Nueva solicitud de boletos aéreos", fields);
+}
+
+async function finalizeFlightLead({ session, from }) {
+  const phoneDigits = String(from || "").replace(/[^\d]/g, "");
+  const summaryText = buildFlightLeadSummary(session, phoneDigits);
+  updateLead(session, { tour_key: "", quotePreview: summaryText, converted: false, followupSent: false });
+  await handoffToHumanTool({ summary: summaryText });
+  await notifyPersonalWhatsAppLeadSummary(summaryText, phoneDigits);
+
+  const itinerary = Array.isArray(session.pendingMultiCitySegments) && session.pendingMultiCitySegments.length
+    ? `
+🗺️ Itinerario: *${session.pendingMultiCitySegments.map((seg, idx) => `${idx + 1}. ${seg.destination} | ${seg.date}`).join(" ; ")}*`
+    : `
+🌍 Destino: *${session.pendingDestination || "—"}*
+📅 Fecha de ida: *${session.pendingTravelDateText || "—"}*${session.pendingTravelEndDateText ? `
+↩️ Fecha de regreso: *${session.pendingTravelEndDateText}*` : ""}`;
+  const requirementLine = session.pendingVisaRequirement ? `
+🛂 Requisito del destino: *${session.pendingVisaRequirement}*` : "";
+  const baggageLine = session.pendingBaggage === "Sí" ? `
+🧳 Equipaje adicional: *Sí* (${session.pendingBaggageType || "Por confirmar"})` : `
+🧳 Equipaje adicional: *No*`;
+  await sendWhatsAppText(
+    from,
+    `✅ *Solicitud recibida*
+
+` +
+      `✈️ Modalidad: *${session.pendingFlightType || "—"}*` +
+      `${requirementLine}` +
+      `${itinerary}` +
+      `
+👥 Personas: *${session.pendingPassengers || "—"}*` +
+      `${baggageLine}` +
+      `
+👤 Nombre: *${session.pendingName || "—"}*
+
+` +
+      `Te estaremos comunicando con un asesor para ayudarte con la búsqueda.`
+  );
+  clearIntakeFlow(session);
+}
+
+function buildPromotionLeadSummary(session, phoneDigits) {
+  const fields = [
+    { label: "🧩 Servicio", value: serviceLineLabel("promociones") },
+    { label: "🏖️ Categoría", value: session.pendingPromotionScope || session.pendingCategory || "—" },
+    { label: "👥 Modalidad", value: session.pendingPromotionType || "—" },
+  ];
+  if (session.pendingPromotionMonth) fields.push({ label: "📅 Mes / fecha", value: session.pendingPromotionMonth });
+  if (session.pendingPromotionGroupType) fields.push({ label: "🏨 Tipo de grupo", value: session.pendingPromotionGroupType });
+  fields.push({ label: "👤 Cliente", value: session.pendingName || "—" });
+  fields.push({ label: "📱 WhatsApp", value: phoneDigits || "—" });
+  return buildLeadSummary("Nueva solicitud de promociones", fields);
+}
+
+async function finalizePromotionLead({ session, from }) {
+  const phoneDigits = String(from || "").replace(/[^\d]/g, "");
+  const summaryText = buildPromotionLeadSummary(session, phoneDigits);
+  updateLead(session, { tour_key: "", quotePreview: summaryText, converted: false, followupSent: false });
+  await handoffToHumanTool({ summary: summaryText });
+  await notifyPersonalWhatsAppLeadSummary(summaryText, phoneDigits);
+
+  const monthLine = session.pendingPromotionMonth ? `
+📅 Mes / fecha: *${session.pendingPromotionMonth}*` : "";
+  const groupLine = session.pendingPromotionGroupType ? `
+🏨 Tipo de grupo: *${session.pendingPromotionGroupType}*` : "";
+  await sendWhatsAppText(
+    from,
+    `✅ *Solicitud recibida*
+
+` +
+      `🔥 Servicio: *Promociones*
+` +
+      `🏖️ Categoría: *${session.pendingPromotionScope || session.pendingCategory || "—"}*
+` +
+      `👥 Modalidad: *${session.pendingPromotionType || "—"}*` +
+      `${monthLine}` +
+      `${groupLine}` +
+      `
+👤 Nombre: *${session.pendingName || "—"}*
+
+` +
       `Te estaremos comunicando con un asesor para continuar con la búsqueda.`
   );
   clearIntakeFlow(session);
@@ -3009,6 +3220,12 @@ Envíamelo así: 829XXXXXXX`);
 }
 
 async function startSimpleServiceFlow({ session, serviceLineKey, from }) {
+  if (serviceLineKey === "boletos_aereos") {
+    session.state = "await_flight_trip_type";
+    await sendWhatsAppText(from, formatNumberedOptionsText("✈️ *Boletos aéreos*", "Selecciona el tipo de viaje que deseas cotizar:", FLIGHT_TYPE_OPTIONS));
+    return true;
+  }
+
   if (serviceLineKey === "paquetes_vacacionales") {
     session.state = "await_package_destination";
     session.packageMenuMode = "main";
@@ -3020,12 +3237,8 @@ Selecciona una opción principal para continuar con la cotización.`);
   }
 
   if (serviceLineKey === "promociones") {
-    session.state = "await_package_destination";
-    session.packageMenuMode = "promos";
-    await sendWhatsAppText(from, `Perfecto 🔥 Vamos con *promociones*.
-
-Aquí te muestro las promociones disponibles para que elijas la que deseas consultar.`);
-    await sendPackagePromotionsList(from, session);
+    session.state = "await_promo_category";
+    await sendWhatsAppText(from, formatNumberedOptionsText("🔥 *Promociones*", "Selecciona una opción:", PROMOTION_MAIN_OPTIONS));
     return true;
   }
 
@@ -3033,10 +3246,16 @@ Aquí te muestro las promociones disponibles para que elijas la que deseas consu
     session.state = "await_cruise_ferry_type";
     await sendWhatsAppText(
       from,
-      `🛳️ *Cruceros y Ferries del Caribe*\n\n` +
-        `Selecciona una opción:\n\n` +
+      `🛳️ *Cruceros y Ferries del Caribe*
+
+` +
+        `Selecciona una opción:
+
+` +
         CRUISE_FERRY_OPTIONS.map((item, idx) => `${idx + 1}. ${item.title}`).join("\n") +
-        `\n\nResponde con el *número* o el *nombre* de la opción.`
+        `
+
+Responde con el *número* o el *nombre* de la opción.`
     );
     return true;
   }
@@ -3044,7 +3263,9 @@ Aquí te muestro las promociones disponibles para que elijas la que deseas consu
   if (serviceLineKey === "daypass_excursiones") {
     session.pendingRealTourGroup = "daypass_excursiones";
     session.state = "await_real_tour_choice";
-    await sendWhatsAppText(from, `🌴 *Daypass excursiones*\n\nTe mostraré las opciones disponibles para que elijas la que deseas consultar.`);
+    await sendWhatsAppText(from, `🌴 *Daypass excursiones*
+
+Te mostraré las opciones disponibles para que elijas la que deseas consultar.`);
     await sendRealToursByGroup(from, "daypass_excursiones", session);
     return true;
   }
@@ -3052,7 +3273,9 @@ Aquí te muestro las promociones disponibles para que elijas la que deseas consu
   if (serviceLineKey === "daypass_resorts") {
     session.pendingRealTourGroup = "daypass_resorts";
     session.state = "await_real_tour_choice";
-    await sendWhatsAppText(from, `🏖️ *Daypass resorts*\n\nTe mostraré las opciones disponibles para que elijas la que deseas consultar.`);
+    await sendWhatsAppText(from, `🏖️ *Daypass resorts*
+
+Te mostraré las opciones disponibles para que elijas la que deseas consultar.`);
     await sendRealToursByGroup(from, "daypass_resorts", session);
     return true;
   }
@@ -3061,10 +3284,16 @@ Aquí te muestro las promociones disponibles para que elijas la que deseas consu
     session.state = "await_parks_activities_type";
     await sendWhatsAppText(
       from,
-      `🎟️ *Entradas parques temáticos y actividades 🇩🇴*\n\n` +
-        `Selecciona una opción:\n\n` +
+      `🎟️ *Entradas parques temáticos y actividades 🇩🇴*
+
+` +
+        `Selecciona una opción:
+
+` +
         PARKS_ACTIVITIES_OPTIONS.map((item, idx) => `${idx + 1}. ${item.title}`).join("\n") +
-        `\n\nResponde con el *número* o el *nombre* de la opción.`
+        `
+
+Responde con el *número* o el *nombre* de la opción.`
     );
     return true;
   }
@@ -3073,10 +3302,16 @@ Aquí te muestro las promociones disponibles para que elijas la que deseas consu
     session.state = "await_hotel_scope_choice";
     await sendWhatsAppText(
       from,
-      `🏨 *Hoteles nacionales e internacionales*\n\n` +
-        `Selecciona una opción:\n\n` +
+      `🏨 *Hoteles nacionales e internacionales*
+
+` +
+        `Selecciona una opción:
+
+` +
         HOTEL_SCOPE_OPTIONS.map((item, idx) => `${idx + 1}. ${item.title}`).join("\n") +
-        `\n\nResponde con el *número* o el *nombre* de la opción.`
+        `
+
+Responde con el *número* o el *nombre* de la opción.`
     );
     return true;
   }
@@ -3178,39 +3413,60 @@ Ahora dime tu *nombre completo*.` },
   {
     serviceLineKey: "seguros_viaje",
     startState: "await_insurance_destination",
-    startPrompt: `Perfecto 🛡️ Vamos con *seguros de viaje*.
+    startPrompt: `Perfecto 🛡️ Vamos con *seguros de viajes*.
 
-¿A qué *país o destino* viajas?`,
+Indícame el *destino de viaje*.` ,
     summaryTitle: "Nueva solicitud de seguro de viaje",
     buildSummaryFields: (session, phoneDigits) => [
       { label: "🧩 Servicio", value: serviceLineLabel("seguros_viaje") },
       { label: "🌍 Destino", value: session.pendingDestination || "—" },
-      { label: "📆 Días de viaje", value: session.pendingTripDays || "—" },
+      { label: "✈️ Fecha de ida", value: session.pendingTravelDateText || "—" },
+      { label: "↩️ Fecha de regreso", value: session.pendingTravelEndDateText || "—" },
+      { label: "👨‍👩‍👧 Cobertura", value: session.pendingCategory || "—" },
       { label: "👥 Personas", value: session.pendingPassengers || "—" },
-      { label: "🎂 Edades", value: session.pendingTravelerAgesText || "—" },
+      { label: "🛂 Trámite de visado", value: session.pendingVisaRequirement || "—" },
+      { label: "🏛️ Embajada", value: session.pendingEmbassy || "—" },
       { label: "👤 Cliente", value: session.pendingName || "—" },
       { label: "📞 Tel", value: phoneDigits || "—" },
     ],
     buildConfirmationText: (session) =>
       `✅ *Solicitud recibida*
 
-Recibí tu solicitud de *seguro de viaje* y nuestro equipo te contactará con opciones según:
+` +
+      `Recibí tu solicitud de *seguros de viajes* y nuestro equipo te contactará con opciones según:
 ` +
       `• destino: ${session.pendingDestination || "—"}
 ` +
-      `• días: ${session.pendingTripDays || "—"}
+      `• fecha de ida: ${session.pendingTravelDateText || "—"}
 ` +
-      `• personas: ${session.pendingPassengers || "—"}
+      `• fecha de regreso: ${session.pendingTravelEndDateText || "—"}
 ` +
-      `• edades: ${session.pendingTravelerAgesText || "—"}`,
+      `• individual o familiar: ${session.pendingCategory || "—"}
+` +
+      `• cantidad de personas: ${session.pendingPassengers || "—"}
+` +
+      `• visado: ${session.pendingVisaRequirement || "—"}${session.pendingEmbassy ? ` (${session.pendingEmbassy})` : ""}`,
     steps: [
-      { state: "await_insurance_destination", kind: "text", minLen: 2, field: "pendingDestination", nextState: "await_insurance_days", invalidPrompt: `Indícame el *país o destino* para tu seguro de viaje.`, prompt: `Perfecto 🛡️
-¿Cuántos *días* durará el viaje?` },
-      { state: "await_insurance_days", kind: "count", minValue: 1, field: "pendingTripDays", nextState: "await_insurance_people", invalidPrompt: `Indícame cuántos *días* durará el viaje. Ej: 5, 8, 12...`, prompt: `Gracias. Ahora dime cuántas *personas* viajan.` },
-      { state: "await_insurance_people", kind: "count", minValue: 1, field: "pendingPassengers", nextState: "await_insurance_ages", invalidPrompt: `Indícame cuántas *personas* necesitan el seguro. Ej: 1, 2, 3...`, prompt: `Perfecto. Ahora dime las *edades* de los viajeros.
-Ej: 34 y 29 / 40, 12 y 8` },
-      { state: "await_insurance_ages", kind: "text", minLen: 1, field: "pendingTravelerAgesText", nextState: "await_insurance_name", invalidPrompt: `Por favor, indícame las *edades* de los viajeros.`, prompt: `Perfecto 👍
-Ahora dime tu *nombre completo*.` },
+      { state: "await_insurance_destination", kind: "text", minLen: 2, field: "pendingDestination", nextState: "await_insurance_departure_date", invalidPrompt: `Indícame el *destino de viaje*.`, prompt: `Perfecto 🛡️
+Ahora dime la *fecha de ida* (salida desde Rep. Dom).` },
+      { state: "await_insurance_departure_date", kind: "text", minLen: 2, field: "pendingTravelDateText", nextState: "await_insurance_return_date", invalidPrompt: `Indícame la *fecha de ida* (salida desde Rep. Dom).`, prompt: `Gracias. Ahora dime la *fecha de regreso* (llegada a Rep. Dom).` },
+      { state: "await_insurance_return_date", kind: "text", minLen: 2, field: "pendingTravelEndDateText", nextState: "await_insurance_type", invalidPrompt: `Indícame la *fecha de regreso* (llegada a Rep. Dom).`, prompt: `Perfecto 👍
+¿Es *individual* o *familiar*?` },
+      { state: "await_insurance_type", kind: "text", minLen: 2, field: "pendingCategory", nextState: "await_insurance_people", invalidPrompt: `Responde si el seguro es *individual* o *familiar*.`, prompt: `Gracias. Ahora dime la *cantidad de personas*.` },
+      { state: "await_insurance_people", kind: "count", minValue: 1, field: "pendingPassengers", nextState: "await_insurance_visa", invalidPrompt: `Indícame la *cantidad de personas*. Ej: 1, 2, 3...`, prompt: `¿Es para *tramitar visado*?
+Responde *sí* o *no*.` },
+      { state: "await_insurance_visa", kind: "text", minLen: 2, field: "pendingVisaRequirement", nextState: "await_insurance_name", invalidPrompt: `Responde *sí* o *no* para saber si es para tramitar visado.`, prompt: ``, assign: (session, value, raw) => { session.pendingVisaRequirement = /^(si|sí)/i.test(String(raw || '').trim()) ? 'Sí' : 'No'; }, afterValid: async ({ session, from, userText }) => {
+          if (/^(si|sí)/i.test(String(userText || '').trim())) {
+            session.state = "await_insurance_embassy";
+            await sendWhatsAppText(from, `Perfecto 👍
+Especifícame la *embajada*.`);
+          } else {
+            await sendWhatsAppText(from, `Perfecto ✅
+Ahora indícame tu *nombre completo*.`);
+          }
+        } },
+      { state: "await_insurance_embassy", kind: "text", minLen: 2, field: "pendingEmbassy", nextState: "await_insurance_name", invalidPrompt: `Indícame la *embajada* para el trámite.`, prompt: `Perfecto ✅
+Ahora indícame tu *nombre completo*.` },
       { state: "await_insurance_name", kind: "text", minLen: 3, field: "pendingName", nextState: "await_insurance_phone", invalidPrompt: `Por favor, envíame tu *nombre completo* 🙂`, prompt: `Gracias. Ahora envíame tu *número de teléfono* para que el equipo te contacte.` },
       { state: "await_insurance_phone", kind: "phone" },
     ],
@@ -3220,34 +3476,40 @@ Ahora dime tu *nombre completo*.` },
     startState: "await_transfer_route",
     startPrompt: `Perfecto 🚖 Vamos con *traslados*.
 
-Dime la *ruta* que necesitas.
-Ej: aeropuerto → hotel / hotel → aeropuerto / ciudad → ciudad.`,
+Favor indicar la *ruta* que necesitas Origen - Destino.
+Ejemplo: Aeropuerto Las Américas - Hotel en Juan Dolio.`,
     summaryTitle: "Nueva solicitud de traslado",
     buildSummaryFields: (session, phoneDigits) => [
       { label: "🧩 Servicio", value: serviceLineLabel("traslados") },
       { label: "🚕 Ruta", value: session.pendingTransferRoute || "—" },
       { label: "📅 Fecha", value: session.pendingTravelDateText || "—" },
       { label: "👥 Personas", value: session.pendingPassengers || "—" },
+      { label: "🧳 Lleva equipaje", value: session.pendingBaggage || "—" },
       { label: "👤 Cliente", value: session.pendingName || "—" },
       { label: "📞 Tel", value: phoneDigits || "—" },
     ],
     buildConfirmationText: (session) =>
       `✅ *Solicitud recibida*
 
-Recibí tu solicitud de *traslado* y nuestro equipo te contactará con opciones según:
+` +
+      `Recibí tu solicitud de *traslado* y nuestro equipo te contactará con opciones según:
 ` +
       `• ruta: ${session.pendingTransferRoute || "—"}
 ` +
       `• fecha: ${session.pendingTravelDateText || "—"}
 ` +
-      `• personas: ${session.pendingPassengers || "—"}`,
+      `• personas: ${session.pendingPassengers || "—"}
+` +
+      `• equipaje: ${session.pendingBaggage || "—"}`,
     steps: [
-      { state: "await_transfer_route", kind: "text", minLen: 2, field: "pendingTransferRoute", nextState: "await_transfer_date", invalidPrompt: `Dime la *ruta del traslado*.
-Ej: aeropuerto → hotel / hotel → aeropuerto / ciudad → ciudad.`, prompt: `Perfecto 🚕
+      { state: "await_transfer_route", kind: "text", minLen: 2, field: "pendingTransferRoute", nextState: "await_transfer_date", invalidPrompt: `Favor indicar la *ruta* que necesitas Origen - Destino.
+Ejemplo: Aeropuerto Las Américas - Hotel en Juan Dolio.`, prompt: `Perfecto 🚖
 Ahora dime la *fecha aproximada* del traslado.` },
       { state: "await_transfer_date", kind: "text", minLen: 2, field: "pendingTravelDateText", nextState: "await_transfer_people", invalidPrompt: `Por favor, indícame la *fecha aproximada* del traslado.`, prompt: `Gracias. ¿Para cuántas *personas* sería el traslado?` },
-      { state: "await_transfer_people", kind: "count", minValue: 1, field: "pendingPassengers", nextState: "await_transfer_name", invalidPrompt: `Indícame cuántas *personas* viajarían. Ej: 2`, prompt: `Perfecto 👍
-Ahora dime tu *nombre completo*.` },
+      { state: "await_transfer_people", kind: "count", minValue: 1, field: "pendingPassengers", nextState: "await_transfer_luggage", invalidPrompt: `Indícame cuántas *personas* viajarían. Ej: 2`, prompt: `Perfecto 👍
+¿*Lleva/n equipaje*? Responde *sí* o *no*.` },
+      { state: "await_transfer_luggage", kind: "text", minLen: 2, field: "pendingBaggage", nextState: "await_transfer_name", invalidPrompt: `Responde *sí* o *no* para indicar si lleva/n equipaje.`, assign: (session, value, raw) => { session.pendingBaggage = /^(si|sí)/i.test(String(raw || '').trim()) ? 'Sí' : /^no/i.test(String(raw || '').trim()) ? 'No' : String(raw || '').trim(); }, prompt: `Perfecto ✅
+Ahora indícame tu *nombre completo*.` },
       { state: "await_transfer_name", kind: "text", minLen: 3, field: "pendingName", nextState: "await_transfer_phone", invalidPrompt: `Por favor, envíame tu *nombre completo* 🙂`, prompt: `Gracias. Ahora envíame tu *número de teléfono* para que el equipo te contacte.` },
       { state: "await_transfer_phone", kind: "phone" },
     ],
@@ -5137,12 +5399,21 @@ app.post("/webhook", async (req, res) => {
         return res.sendStatus(200);
       }
 
-      if (["await_hotel_scope_choice", "await_hotel_national_type", "await_hotel_profile", "await_hotel_view_mode", "await_hotel_option_choice", "await_hotel_destination_custom", "await_hotel_date_custom", "await_hotel_adults_custom", "await_hotel_children_custom", "await_hotel_children_ages_custom", "await_hotel_budget_custom", "await_hotel_name_custom"].includes(session.state)) {
+      if (["await_hotel_scope_choice", "await_hotel_national_type", "await_hotel_international_type", "await_hotel_profile", "await_hotel_view_mode", "await_hotel_option_choice", "await_hotel_destination_custom", "await_hotel_zone_choice", "await_hotel_zone_specify", "await_hotel_intl_all_inclusive_destination", "await_hotel_intl_all_inclusive_other", "await_hotel_date_custom", "await_hotel_adults_custom", "await_hotel_children_custom", "await_hotel_children_ages_custom", "await_hotel_budget_custom", "await_hotel_name_custom"].includes(session.state)) {
         clearIntakeFlow(session);
         session.pendingServiceLine = "solo_hoteles";
         session.state = "await_hotel_scope_choice";
         await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *hoteles nacionales e internacionales*.`);
         await sendWhatsAppText(from, formatNumberedOptionsText("🏨 *Hoteles nacionales e internacionales*", "Selecciona una opción:", HOTEL_SCOPE_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (["await_flight_trip_type", "await_flight_solo_ida_requirement", "await_flight_destination", "await_flight_departure_date", "await_flight_return_date", "await_flight_multicity_destination", "await_flight_multicity_date", "await_flight_multicity_add_more", "await_flight_people", "await_flight_baggage", "await_flight_baggage_type", "await_flight_name"].includes(session.state)) {
+        clearIntakeFlow(session);
+        session.pendingServiceLine = "boletos_aereos";
+        session.state = "await_flight_trip_type";
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *boletos aéreos*.`);
+        await sendWhatsAppText(from, formatNumberedOptionsText("✈️ *Boletos aéreos*", "Selecciona el tipo de viaje que deseas cotizar:", FLIGHT_TYPE_OPTIONS));
         return res.sendStatus(200);
       }
 
@@ -5161,6 +5432,15 @@ app.post("/webhook", async (req, res) => {
         session.state = "await_parks_activities_type";
         await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *entradas parques temáticos y actividades*.`);
         await sendWhatsAppText(from, formatNumberedOptionsText("🎟️ *Entradas parques temáticos y actividades 🇩🇴*", "Selecciona una opción:", PARKS_ACTIVITIES_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (["await_promo_category", "await_promo_resort_type", "await_promo_month", "await_promo_group_type", "await_promo_group_date", "await_promo_name"].includes(session.state)) {
+        clearIntakeFlow(session);
+        session.pendingServiceLine = "promociones";
+        session.state = "await_promo_category";
+        await sendWhatsAppText(from, `↩️ Perfecto. Volviste al menú principal de *promociones*.`);
+        await sendWhatsAppText(from, formatNumberedOptionsText("🔥 *Promociones*", "Selecciona una opción:", PROMOTION_MAIN_OPTIONS));
         return res.sendStatus(200);
       }
 
@@ -5370,6 +5650,195 @@ Ahora indícame tu *nombre completo*.`);
     }
 
     // =========================
+    // CUSTOM FLIGHTS FLOW
+    // =========================
+    if (session.state === "await_flight_trip_type") {
+      const option = parseMenuOption(userText, FLIGHT_TYPE_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("✈️ *Boletos aéreos*", "Selecciona el tipo de viaje que deseas cotizar:", FLIGHT_TYPE_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingFlightType = option.title;
+      session.pendingMultiCitySegments = [];
+      session.pendingTravelEndDateText = null;
+      session.pendingVisaRequirement = null;
+      if (option.key === "solo_ida") {
+        session.state = "await_flight_solo_ida_requirement";
+        await sendWhatsAppText(from, `✈️ *Solo ida*
+
+Nota importante: este tipo de boleto puede requerir *nacionalidad, residencia o visado especial* del país destino.`);
+        await sendWhatsAppText(from, formatNumberedOptionsText("🛂 *Requisito del país destino*", "¿Cuentas con ese requisito?", FLIGHT_SOLO_IDA_REQUIREMENT_OPTIONS));
+      } else if (option.key === "multiples_ciudades") {
+        session.state = "await_flight_multicity_destination";
+        await sendWhatsAppText(from, `🗺️ *Múltiples ciudades y/o países*
+
+Indícame el *primer destino* (ciudad y/o aeropuerto).`);
+      } else {
+        session.state = "await_flight_destination";
+        await sendWhatsAppText(from, `✈️ *Ida y vuelta*
+
+Indícame el *destino* (ciudad y/o aeropuerto).`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_solo_ida_requirement") {
+      const option = parseMenuOption(userText, FLIGHT_SOLO_IDA_REQUIREMENT_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🛂 *Requisito del país destino*", "¿Cuentas con ese requisito?", FLIGHT_SOLO_IDA_REQUIREMENT_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingVisaRequirement = option.title;
+      session.state = "await_flight_destination";
+      await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame el *destino* (ciudad y/o aeropuerto).`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_destination") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame el *destino* (ciudad y/o aeropuerto).`);
+        return res.sendStatus(200);
+      }
+      session.pendingDestination = userText;
+      session.state = "await_flight_departure_date";
+      await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *fecha de ida*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_departure_date") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *fecha de ida*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingTravelDateText = userText;
+      if (normalizeText(session.pendingFlightType || "").includes("ida y vuelta")) {
+        session.state = "await_flight_return_date";
+        await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *fecha de regreso*.`);
+      } else {
+        session.state = "await_flight_people";
+        await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *cantidad de personas*.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_return_date") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *fecha de regreso*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingTravelEndDateText = userText;
+      session.state = "await_flight_people";
+      await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *cantidad de personas*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_multicity_destination") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame el *destino* (ciudad y/o aeropuerto).`);
+        return res.sendStatus(200);
+      }
+      session.pendingDestination = userText;
+      session.state = "await_flight_multicity_date";
+      await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *fecha de ida* para *${userText}*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_multicity_date") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *fecha de ida* de ese tramo.`);
+        return res.sendStatus(200);
+      }
+      const segments = Array.isArray(session.pendingMultiCitySegments) ? session.pendingMultiCitySegments : [];
+      segments.push({ destination: session.pendingDestination || "Destino", date: userText });
+      session.pendingMultiCitySegments = segments;
+      session.state = "await_flight_multicity_add_more";
+      await sendWhatsAppText(from, `Perfecto 🙌
+
+Escribe *agregar* para añadir otro destino o *finalizar* para continuar con la solicitud.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_multicity_add_more") {
+      if (tNorm.includes("agregar")) {
+        session.state = "await_flight_multicity_destination";
+        await sendWhatsAppText(from, `Perfecto 👍
+Indícame el *siguiente destino* (ciudad y/o aeropuerto).`);
+        return res.sendStatus(200);
+      }
+      if (!tNorm.includes("finalizar")) {
+        await sendWhatsAppText(from, `Escribe *agregar* para añadir otro destino o *finalizar* para continuar.`);
+        return res.sendStatus(200);
+      }
+      session.state = "await_flight_people";
+      await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *cantidad de personas*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_people") {
+      const count = parsePassengerCount(userText);
+      if (count === null || count < 1) {
+        await sendWhatsAppText(from, `Indícame la *cantidad de personas*. Ej: 1, 2, 3...`);
+        return res.sendStatus(200);
+      }
+      session.pendingPassengers = count;
+      session.state = "await_flight_baggage";
+      await sendWhatsAppText(from, formatNumberedOptionsText("🧳 *Equipaje adicional*", "¿Llevas equipaje adicional al artículo personal?", BAGGAGE_OPTIONS));
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_baggage") {
+      const option = parseMenuOption(userText, BAGGAGE_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🧳 *Equipaje adicional*", "¿Llevas equipaje adicional al artículo personal?", BAGGAGE_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingBaggage = option.title;
+      if (option.key === "si") {
+        session.state = "await_flight_baggage_type";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🧳 *Tipo de equipaje*", "Selecciona una opción:", BAGGAGE_TYPE_OPTIONS));
+      } else {
+        session.pendingBaggageType = "";
+        session.state = "await_flight_name";
+        await sendWhatsAppText(from, `Perfecto ✅
+Ahora indícame tu *nombre completo*.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_baggage_type") {
+      const option = parseMenuOption(userText, BAGGAGE_TYPE_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🧳 *Tipo de equipaje*", "Selecciona una opción:", BAGGAGE_TYPE_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingBaggageType = option.title;
+      session.state = "await_flight_name";
+      await sendWhatsAppText(from, `Perfecto ✅
+Ahora indícame tu *nombre completo*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_flight_name") {
+      if (tNorm.length < 3 || ["si", "sí", "ok", "listo"].includes(tNorm)) {
+        await sendWhatsAppText(from, `Por favor, envíame tu *nombre completo* 🙂`);
+        return res.sendStatus(200);
+      }
+      session.pendingName = userText;
+      await finalizeFlightLead({ session, from });
+      return res.sendStatus(200);
+    }
+
+    // =========================
+    // CUSTOM HOTELS FLOW
+    // =========================
+    // =========================
     // CUSTOM HOTELS FLOW
     // =========================
     if (session.state === "await_hotel_scope_choice") {
@@ -5379,14 +5848,12 @@ Ahora indícame tu *nombre completo*.`);
         return res.sendStatus(200);
       }
       session.pendingCategory = option.title;
-      if (option.key === "internacionales") {
-        session.pendingOrigin = "Asistencia con asesor";
-        session.pendingDepartureCity = "Búsqueda personalizada";
-        session.state = "await_hotel_destination_custom";
-        await sendWhatsAppText(from, `🌍 *Hoteles internacionales*\n\nTe estaremos comunicando con un asesor especializado para ayudarte con la búsqueda.\n\nAntes de continuar, indícame por favor el *destino o ciudad* que te interesa.`);
-      } else {
+      if (option.key === "nacionales") {
         session.state = "await_hotel_national_type";
         await sendWhatsAppText(from, formatNumberedOptionsText("🇩🇴 *Hoteles nacionales*", "Selecciona el tipo de estadía que deseas:", HOTEL_NATIONAL_STAY_OPTIONS));
+      } else {
+        session.state = "await_hotel_international_type";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🌍 *Hoteles internacionales*", "Selecciona el tipo de estadía que deseas:", HOTEL_INTERNATIONAL_STAY_OPTIONS));
       }
       return res.sendStatus(200);
     }
@@ -5398,13 +5865,41 @@ Ahora indícame tu *nombre completo*.`);
         return res.sendStatus(200);
       }
       session.pendingOrigin = option.title;
-      if (option.key === "solo_alojamiento") {
-        session.pendingDepartureCity = "Búsqueda personalizada";
-        session.state = "await_hotel_destination_custom";
-        await sendWhatsAppText(from, `🛏️ *Solo alojamiento*\n\nPara esta opción, te estaremos comunicando con un asesor.\n\nAntes de continuar, indícame por favor la *zona o destino* que deseas consultar.`);
-      } else {
+      if (option.key === "todo_incluido") {
         session.state = "await_hotel_profile";
-        await sendWhatsAppText(from, formatNumberedOptionsText("🍹 *Hoteles todo incluido*", "Selecciona el tipo de hotel que deseas ver:", HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS));
+        await sendWhatsAppText(from, formatNumberedOptionsText("🍹 *Hoteles nacionales · Todo incluido*", "Selecciona el tipo de hotel que deseas ver:", HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS));
+      } else {
+        session.pendingHotelStars = null;
+        session.pendingDepartureCity = null;
+        session.pendingRange = null;
+        session.state = "await_hotel_destination_custom";
+        await sendWhatsAppText(from, `🛏️ *Hoteles nacionales · Alojamiento*
+
+Indícame la *ciudad y país* donde deseas hospedarte.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_international_type") {
+      const option = parseMenuOption(userText, HOTEL_INTERNATIONAL_STAY_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🌍 *Hoteles internacionales*", "Selecciona el tipo de estadía que deseas:", HOTEL_INTERNATIONAL_STAY_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingOrigin = option.title;
+      session.pendingRange = null;
+      if (option.key === "solo_alojamiento") {
+        session.pendingHotelStars = null;
+        session.pendingDepartureCity = null;
+        session.state = "await_hotel_destination_custom";
+        await sendWhatsAppText(from, `🛏️ *Hoteles internacionales · Alojamiento*
+
+Indícame la *ciudad y país* donde deseas hospedarte.`);
+      } else {
+        session.pendingHotelStars = "Todo incluido";
+        session.pendingDepartureCity = null;
+        session.state = "await_hotel_intl_all_inclusive_destination";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🌴 *Hoteles internacionales · Todo incluido*", "Aplica solo para algunos destinos. Selecciona una opción:", HOTEL_INTL_ALL_INCLUSIVE_DESTINATION_OPTIONS));
       }
       return res.sendStatus(200);
     }
@@ -5412,7 +5907,7 @@ Ahora indícame tu *nombre completo*.`);
     if (session.state === "await_hotel_profile") {
       const option = parseMenuOption(userText, HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS);
       if (!option) {
-        await sendWhatsAppText(from, formatNumberedOptionsText("🍹 *Hoteles todo incluido*", "Selecciona el tipo de hotel que deseas ver:", HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS));
+        await sendWhatsAppText(from, formatNumberedOptionsText("🍹 *Hoteles nacionales · Todo incluido*", "Selecciona el tipo de hotel que deseas ver:", HOTEL_ALL_INCLUSIVE_PROFILE_OPTIONS));
         return res.sendStatus(200);
       }
       session.pendingHotelStars = option.title;
@@ -5429,60 +5924,113 @@ Ahora indícame tu *nombre completo*.`);
       }
       session.pendingDepartureCity = option.title;
       session.state = "await_hotel_option_choice";
-      await sendWhatsAppText(
-        from,
-        formatNumberedOptionsText(
-          option.key === "por_presupuesto" ? `💵 *${session.pendingHotelStars || "Hoteles"} por presupuesto*` : `📍 *${session.pendingHotelStars || "Hoteles"} por polo turístico*`,
-          "Selecciona una opción:",
-          getHotelProfileOptions(session.pendingHotelStars, option.title)
-        )
-      );
+      await sendWhatsAppText(from, formatNumberedOptionsText(`🏨 *${session.pendingHotelStars || "Hoteles"}*`, "Selecciona una opción:", getHotelProfileOptions(session.pendingHotelStars || "", option.title || "")));
       return res.sendStatus(200);
     }
 
     if (session.state === "await_hotel_option_choice") {
-      const options = getHotelProfileOptions(session.pendingHotelStars, session.pendingDepartureCity);
+      const options = getHotelProfileOptions(session.pendingHotelStars || "", session.pendingDepartureCity || "");
       const option = parseMenuOption(userText, options);
       if (!option) {
-        await sendWhatsAppText(
-          from,
-          formatNumberedOptionsText(
-            normalizeText(session.pendingDepartureCity).includes("presupuesto") ? `💵 *${session.pendingHotelStars || "Hoteles"} por presupuesto*` : `📍 *${session.pendingHotelStars || "Hoteles"} por polo turístico*`,
-            "Selecciona una opción:",
-            options
-          )
-        );
+        await sendWhatsAppText(from, formatNumberedOptionsText(`🏨 *${session.pendingHotelStars || "Hoteles"}*`, "Selecciona una opción:", options));
         return res.sendStatus(200);
       }
-      if (normalizeText(session.pendingDepartureCity).includes("presupuesto")) {
+      session.pendingDestination = option.title;
+      if (normalizeText(session.pendingDepartureCity || "").includes("presupuesto")) {
         session.pendingRange = option.title;
-      } else {
-        session.pendingDestination = option.title;
       }
+      session.pendingSpecificZone = null;
       session.state = "await_hotel_date_custom";
-      await sendWhatsAppText(from, `Perfecto 🙌\n\nAhora indícame la *fecha deseada*.`);
+      await sendWhatsAppText(from, `Perfecto 🙌
+
+Ahora indícame la *fecha deseada*.`);
       return res.sendStatus(200);
     }
 
     if (session.state === "await_hotel_destination_custom") {
       if (tNorm.length < 2) {
-        await sendWhatsAppText(from, `Por favor, indícame el *destino o zona* que deseas consultar.`);
+        await sendWhatsAppText(from, `Por favor, indícame la *ciudad y país* donde deseas hospedarte.`);
         return res.sendStatus(200);
       }
       session.pendingDestination = userText;
+      session.state = "await_hotel_zone_choice";
+      await sendWhatsAppText(from, formatNumberedOptionsText("📌 *Zona en específico*", "¿Tienes una zona en específico?", HOTEL_ZONE_OPTIONS));
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_zone_choice") {
+      const option = parseMenuOption(userText, HOTEL_ZONE_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("📌 *Zona en específico*", "¿Tienes una zona en específico?", HOTEL_ZONE_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingZonePreference = option.title;
+      if (option.key === "si") {
+        session.state = "await_hotel_zone_specify";
+        await sendWhatsAppText(from, `Perfecto 👍
+Indícame la *zona específica* que deseas.`);
+      } else {
+        session.pendingSpecificZone = "No";
+        session.state = "await_hotel_date_custom";
+        await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *fecha deseada*.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_zone_specify") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *zona específica* que deseas.`);
+        return res.sendStatus(200);
+      }
+      session.pendingSpecificZone = userText;
       session.state = "await_hotel_date_custom";
-      await sendWhatsAppText(from, `Perfecto 🙌\n\nAhora indícame la *fecha deseada*.`);
+      await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *fecha deseada*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_intl_all_inclusive_destination") {
+      const option = parseMenuOption(userText, HOTEL_INTL_ALL_INCLUSIVE_DESTINATION_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🌴 *Hoteles internacionales · Todo incluido*", "Aplica solo para algunos destinos. Selecciona una opción:", HOTEL_INTL_ALL_INCLUSIVE_DESTINATION_OPTIONS));
+        return res.sendStatus(200);
+      }
+      if (option.key === "otros") {
+        session.state = "await_hotel_intl_all_inclusive_other";
+        await sendWhatsAppText(from, `Indícame el *destino* que deseas para hotel internacional todo incluido.`);
+      } else {
+        session.pendingDestination = option.title;
+        session.pendingSpecificZone = null;
+        session.state = "await_hotel_date_custom";
+        await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *fecha deseada*.`);
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_hotel_intl_all_inclusive_other") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame el *destino* que deseas para hotel internacional todo incluido.`);
+        return res.sendStatus(200);
+      }
+      session.pendingDestination = userText;
+      session.pendingSpecificZone = null;
+      session.state = "await_hotel_date_custom";
+      await sendWhatsAppText(from, `Perfecto 👍
+Ahora indícame la *fecha deseada*.`);
       return res.sendStatus(200);
     }
 
     if (session.state === "await_hotel_date_custom") {
       if (tNorm.length < 2) {
-        await sendWhatsAppText(from, `Por favor, indícame la *fecha deseada* para continuar.`);
+        await sendWhatsAppText(from, `Por favor, indícame la *fecha deseada*.`);
         return res.sendStatus(200);
       }
       session.pendingTravelDateText = userText;
       session.state = "await_hotel_adults_custom";
-      await sendWhatsAppText(from, `Perfecto 👍\n¿Cuántos *adultos* viajarían?`);
+      await sendWhatsAppText(from, `Perfecto 👍
+¿Cuántos *adultos* viajarían?`);
       return res.sendStatus(200);
     }
 
@@ -5509,7 +6057,8 @@ Ahora indícame tu *nombre completo*.`);
       session.pendingPassengers = Number(session.pendingAdults || 0) + count;
       if (count > 0) {
         session.state = "await_hotel_children_ages_custom";
-        await sendWhatsAppText(from, count > 1 ? `Perfecto. Ahora indícame las *edades de los niños separadas por coma*.\nEj: 5, 8` : `Perfecto. Ahora indícame la *edad del niño*.`);
+        await sendWhatsAppText(from, count > 1 ? `Perfecto. Ahora indícame las *edades de los niños separadas por coma*.
+Ej: 5, 8` : `Perfecto. Ahora indícame la *edad del niño*.`);
         return res.sendStatus(200);
       }
       session.pendingChildrenAges = "";
@@ -5518,7 +6067,8 @@ Ahora indícame tu *nombre completo*.`);
         await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la búsqueda.`);
       } else {
         session.state = "await_hotel_name_custom";
-        await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
+        await sendWhatsAppText(from, `Perfecto ✅
+Ahora indícame tu *nombre completo*.`);
       }
       return res.sendStatus(200);
     }
@@ -5526,7 +6076,8 @@ Ahora indícame tu *nombre completo*.`);
     if (session.state === "await_hotel_children_ages_custom") {
       const ages = normalizeChildrenAgesInput(userText, session.pendingChildren || 0);
       if (!ages.ok) {
-        await sendWhatsAppText(from, `Por favor, envíame las *edades de los niños separadas por coma*.\nEj: 5, 8`);
+        await sendWhatsAppText(from, `Por favor, envíame las *edades de los niños separadas por coma*.
+Ej: 5, 8`);
         return res.sendStatus(200);
       }
       session.pendingChildrenAges = ages.formatted;
@@ -5535,7 +6086,8 @@ Ahora indícame tu *nombre completo*.`);
         await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la búsqueda.`);
       } else {
         session.state = "await_hotel_name_custom";
-        await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
+        await sendWhatsAppText(from, `Perfecto ✅
+Ahora indícame tu *nombre completo*.`);
       }
       return res.sendStatus(200);
     }
@@ -5545,9 +6097,10 @@ Ahora indícame tu *nombre completo*.`);
         await sendWhatsAppText(from, `Por favor, indícame tu *presupuesto aproximado*.`);
         return res.sendStatus(200);
       }
-      session.pendingNotes = userText;
+      session.pendingRange = userText;
       session.state = "await_hotel_name_custom";
-      await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
+      await sendWhatsAppText(from, `Perfecto ✅
+Ahora indícame tu *nombre completo*.`);
       return res.sendStatus(200);
     }
 
@@ -5672,6 +6225,84 @@ Ahora indícame tu *nombre completo*.`);
       session.pendingRealTourGroup = option.key;
       session.state = "await_real_tour_choice";
       await sendRealToursByGroup(from, option.key, session);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_promo_category") {
+      const option = parseMenuOption(userText, PROMOTION_MAIN_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🔥 *Promociones*", "Selecciona una opción:", PROMOTION_MAIN_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingPromotionScope = option.title;
+      session.pendingCategory = option.title;
+      session.state = "await_promo_resort_type";
+      await sendWhatsAppText(from, formatNumberedOptionsText("🏖️ *Promociones · Resorts*", "Selecciona una opción:", PROMOTION_RESORT_OPTIONS));
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_promo_resort_type") {
+      const option = parseMenuOption(userText, PROMOTION_RESORT_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🏖️ *Promociones · Resorts*", "Selecciona una opción:", PROMOTION_RESORT_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingPromotionType = option.title;
+      if (option.key === "individuales") {
+        session.state = "await_promo_month";
+        await sendWhatsAppText(from, formatNumberedOptionsText("📅 *Fecha de viaje*", "Elige el mes de viaje:", PROMOTION_MONTH_OPTIONS));
+      } else {
+        session.state = "await_promo_group_type";
+        await sendWhatsAppText(from, formatNumberedOptionsText("👥 *Promociones para grupos*", "Selecciona el tipo de grupo:", PROMOTION_GROUP_OPTIONS));
+      }
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_promo_month") {
+      const option = parseMenuOption(userText, PROMOTION_MONTH_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("📅 *Fecha de viaje*", "Elige el mes de viaje:", PROMOTION_MONTH_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingPromotionMonth = option.title;
+      session.state = "await_promo_name";
+      await sendWhatsAppText(from, `Perfecto ✅
+Ahora indícame tu *nombre completo*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_promo_group_type") {
+      const option = parseMenuOption(userText, PROMOTION_GROUP_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("👥 *Promociones para grupos*", "Selecciona el tipo de grupo:", PROMOTION_GROUP_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingPromotionGroupType = option.title;
+      session.state = "await_promo_group_date";
+      await sendWhatsAppText(from, `Perfecto 👍
+Indícame la *fecha o mes de viaje* para el grupo.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_promo_group_date") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *fecha o mes de viaje* para el grupo.`);
+        return res.sendStatus(200);
+      }
+      session.pendingPromotionMonth = userText;
+      session.state = "await_promo_name";
+      await sendWhatsAppText(from, `Perfecto ✅
+Ahora indícame tu *nombre completo*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_promo_name") {
+      if (tNorm.length < 3 || ["si", "sí", "ok", "listo"].includes(tNorm)) {
+        await sendWhatsAppText(from, `Por favor, envíame tu *nombre completo* 🙂`);
+        return res.sendStatus(200);
+      }
+      session.pendingName = userText;
+      await finalizePromotionLead({ session, from });
       return res.sendStatus(200);
     }
 
