@@ -260,9 +260,11 @@ const FOLLOWUP_ENABLED = (process.env.FOLLOWUP_ENABLED || "1") === "1";
 const FOLLOWUP_AFTER_MIN = parseInt(process.env.FOLLOWUP_AFTER_MIN || "180", 10);
 const FOLLOWUP_MAX_AGE_HOURS = parseInt(process.env.FOLLOWUP_MAX_AGE_HOURS || "72", 10);
 const MENU_INACTIVITY_REMINDER_ENABLED = (process.env.MENU_INACTIVITY_REMINDER_ENABLED || "1") === "1";
-const MENU_REMINDER_1_AFTER_MIN = parseInt(process.env.MENU_REMINDER_1_AFTER_MIN || "30", 10);
-const MENU_REMINDER_2_AFTER_MIN = parseInt(process.env.MENU_REMINDER_2_AFTER_MIN || "1440", 10);
-const MENU_REMINDER_MAX_AGE_HOURS = parseInt(process.env.MENU_REMINDER_MAX_AGE_HOURS || "48", 10);
+const MENU_REMINDER_INTERVAL_MIN = parseInt(process.env.MENU_REMINDER_INTERVAL_MIN || "240", 10);
+const MENU_REMINDER_MAX_AGE_HOURS = parseInt(process.env.MENU_REMINDER_MAX_AGE_HOURS || "24", 10);
+// Compatibilidad con versiones anteriores: se conservan estas variables aunque el nuevo flujo usa intervalo cada 4 horas.
+const MENU_REMINDER_1_AFTER_MIN = parseInt(process.env.MENU_REMINDER_1_AFTER_MIN || String(MENU_REMINDER_INTERVAL_MIN), 10);
+const MENU_REMINDER_2_AFTER_MIN = parseInt(process.env.MENU_REMINDER_2_AFTER_MIN || String(MENU_REMINDER_INTERVAL_MIN * 2), 10);
 
 
 const PERSONAL_WA_TO = (process.env.PERSONAL_WA_TO || "").trim();
@@ -292,6 +294,7 @@ const BOTHUB_JWT_TOKEN = (process.env.BOTHUB_JWT_TOKEN || process.env.CRM_JWT_TO
 const BOTHUB_BOT_ID = (process.env.BOTHUB_BOT_ID || "").trim();
 const HUB_QUEUE_SERVICE_TOURS = (process.env.HUB_QUEUE_SERVICE_TOURS || "Servicio al cliente / Tours").trim();
 const HUB_QUEUE_COMMERCIAL = (process.env.HUB_QUEUE_COMMERCIAL || "Asesoría comercial").trim();
+const HUB_QUEUE_NEW = (process.env.HUB_QUEUE_NEW || process.env.HUB_QUEUE_NUEVOS || "Nuevos").trim();
 
 const BOT_PUBLIC_BASE_URL = (process.env.BOT_PUBLIC_BASE_URL || "").replace(/\/$/, "");
 const HUB_MEDIA_SECRET =
@@ -381,6 +384,8 @@ function defaultMenuReminder() {
     menuShownAt: "",
     reminder1Sent: false,
     reminder2Sent: false,
+    sentCount: 0,
+    lastReminderAt: "",
   };
 }
 
@@ -521,6 +526,11 @@ if (!session.menuReminder || typeof session.menuReminder !== "object") {
   if (typeof session.menuReminder.menuShownAt !== "string") session.menuReminder.menuShownAt = "";
   if (typeof session.menuReminder.reminder1Sent !== "boolean") session.menuReminder.reminder1Sent = false;
   if (typeof session.menuReminder.reminder2Sent !== "boolean") session.menuReminder.reminder2Sent = false;
+  if (typeof session.menuReminder.sentCount !== "number") {
+    session.menuReminder.sentCount =
+      (session.menuReminder.reminder1Sent ? 1 : 0) + (session.menuReminder.reminder2Sent ? 1 : 0);
+  }
+  if (typeof session.menuReminder.lastReminderAt !== "string") session.menuReminder.lastReminderAt = "";
 }
 
   const maybeStringOrNull = [
@@ -676,6 +686,8 @@ function armMenuInactivityReminder(session) {
     menuShownAt: new Date().toISOString(),
     reminder1Sent: false,
     reminder2Sent: false,
+    sentCount: 0,
+    lastReminderAt: "",
   };
 }
 
@@ -900,6 +912,31 @@ async function routeConversationToQueue({ session, phone, queueName, reason = "s
     console.error("routeConversationToQueue failed:", e?.response?.data || e?.message || e);
     return { ok: false, reason: "patch_failed" };
   }
+}
+
+function shouldRouteInboundToNewQueue(session) {
+  if (!HUB_QUEUE_NEW) return false;
+  if (session?.conversationMode === "human") return false;
+  if (session?.pendingServiceLine) return false;
+  if (session?.state && session.state !== "idle") return false;
+  if (session?.lastQueueRouted && session.lastQueueRouted !== HUB_QUEUE_NEW) return false;
+  return true;
+}
+
+async function routeInboundToNewQueueIfNeeded({ session, phone, reason = "inbound_new_lead" }) {
+  if (!session || !shouldRouteInboundToNewQueue(session)) {
+    return { ok: false, skipped: true, reason: "not_new_queue_candidate" };
+  }
+
+  const routed = await routeConversationToQueue({ session, phone, queueName: HUB_QUEUE_NEW, reason });
+  webhookLog("bothub.route_new_queue", {
+    phone: String(phone || ""),
+    queue: HUB_QUEUE_NEW,
+    ok: !!routed?.ok,
+    skipped: !!routed?.skipped,
+    reason: routed?.reason || reason,
+  });
+  return routed;
 }
 
 function extractInboundMeta(msg) {
@@ -5270,6 +5307,7 @@ app.post("/webhook", async (req, res) => {
     const inboundMeta = preprocessed.inboundMeta || extractInboundMeta(msg);
     const inboundMetaWithMediaUrl = attachHubMediaUrl(req, inboundMeta);
 
+    const shouldLandInNewQueue = shouldRouteInboundToNewQueue(session);
     const bothubInboundAck = await bothubReportMessage({
       direction: "INBOUND",
       from: String(from),
@@ -5278,10 +5316,18 @@ app.post("/webhook", async (req, res) => {
       waMessageId: msg?.id,
       name: value?.contacts?.[0]?.profile?.name,
       kind: inboundMetaWithMediaUrl?.kind || (msg?.type ? String(msg.type).toUpperCase() : "UNKNOWN"),
-      meta: inboundMetaWithMediaUrl,
+      queue: shouldLandInNewQueue ? HUB_QUEUE_NEW : undefined,
+      queueName: shouldLandInNewQueue ? HUB_QUEUE_NEW : undefined,
+      meta: {
+        ...inboundMetaWithMediaUrl,
+        queue: shouldLandInNewQueue ? HUB_QUEUE_NEW : undefined,
+      },
       mediaUrl: inboundMetaWithMediaUrl?.mediaUrl || undefined,
     });
     if (bothubInboundAck?.conversationId) session.hubConversationId = String(bothubInboundAck.conversationId);
+    if (shouldLandInNewQueue) {
+      await routeInboundToNewQueueIfNeeded({ session, phone: from, reason: "inbound_new_lead" });
+    }
 
     if (isHumanModeDisableCommand(tNorm)) {
       webhookLog("flow.human_mode_disable", { from, state: session?.state || null });
@@ -6771,20 +6817,17 @@ async function menuInactivityReminderLoop() {
 
     const ids = await listAllSessionIds();
     const now = Date.now();
-    const maxAgeMs = MENU_REMINDER_MAX_AGE_HOURS * 60 * 60 * 1000;
-    const reminder1Ms = MENU_REMINDER_1_AFTER_MIN * 60 * 1000;
-    const reminder2Ms = MENU_REMINDER_2_AFTER_MIN * 60 * 1000;
+    const maxAgeMs = Math.max(1, MENU_REMINDER_MAX_AGE_HOURS) * 60 * 60 * 1000;
+    const intervalMs = Math.max(1, MENU_REMINDER_INTERVAL_MIN) * 60 * 1000;
+    const maxReminders = Math.max(1, Math.floor(maxAgeMs / intervalMs));
 
     for (const id of ids) {
       const s = await getSession(id);
       const reminder = s?.menuReminder || {};
       if (!reminder.active || !reminder.menuShownAt) continue;
+
+      // Si el usuario ya seleccionó una opción del menú o entró en un flujo, se detienen los recordatorios.
       if (s?.pendingServiceLine || s?.state !== "idle") {
-        disableMenuInactivityReminder(s);
-        await saveSession(id, s);
-        continue;
-      }
-      if (hasUserRespondedAfterMenu(s)) {
         disableMenuInactivityReminder(s);
         await saveSession(id, s);
         continue;
@@ -6804,32 +6847,30 @@ async function menuInactivityReminderLoop() {
         continue;
       }
 
-      if (!reminder.reminder1Sent && ageMs >= reminder1Ms) {
-        const msg = `Hola 👋 Quedamos disponibles para ayudarte con tu viaje.
-
-Escribe *menú* y te muestro las opciones disponibles.`;
-        try {
-          await sendWhatsAppText(id, msg, "BOT");
-          s.menuReminder.reminder1Sent = true;
-          await saveSession(id, s);
-        } catch (e) {
-          console.error("menu reminder 1 send error:", id, e?.response?.data || e?.message || e);
-        }
+      const sentCount = Math.max(0, Number(reminder.sentCount || 0));
+      if (sentCount >= maxReminders) {
+        disableMenuInactivityReminder(s);
+        await saveSession(id, s);
         continue;
       }
 
-      if (reminder.reminder1Sent && !reminder.reminder2Sent && ageMs >= reminder2Ms) {
-        const msg = `Seguimos aquí para ayudarte con actividades, hoteles, boletos, cruceros, ferries, seguros o traslados.
+      const nextDueAt = shownAtMs + intervalMs * (sentCount + 1);
+      if (now < nextDueAt) continue;
 
-Si deseas retomar, escribe *menú*.`;
-        try {
-          await sendWhatsAppText(id, msg, "BOT");
-          s.menuReminder.reminder2Sent = true;
-          disableMenuInactivityReminder(s);
-          await saveSession(id, s);
-        } catch (e) {
-          console.error("menu reminder 2 send error:", id, e?.response?.data || e?.message || e);
-        }
+      const msg = `Hola 👋 Seguimos disponibles para ayudarte con tu viaje.
+
+Puedes seleccionar una opción del menú anterior o escribir *menú* para verlo nuevamente.`;
+
+      try {
+        await sendWhatsAppText(id, msg, "BOT");
+        s.menuReminder.sentCount = sentCount + 1;
+        s.menuReminder.lastReminderAt = new Date().toISOString();
+        if (s.menuReminder.sentCount >= 1) s.menuReminder.reminder1Sent = true;
+        if (s.menuReminder.sentCount >= 2) s.menuReminder.reminder2Sent = true;
+        if (s.menuReminder.sentCount >= maxReminders) disableMenuInactivityReminder(s);
+        await saveSession(id, s);
+      } catch (e) {
+        console.error("menu reminder send error:", id, e?.response?.data || e?.message || e);
       }
     }
   } catch (e) {
