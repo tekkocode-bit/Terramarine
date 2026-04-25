@@ -3963,8 +3963,8 @@ function appendNavigationHelp(to, text, reportSource = "BOT") {
 // =========================
 // WhatsApp send helpers
 // =========================
-async function sendWhatsAppText(to, text, reportSource = "BOT") {
-  const finalText = appendNavigationHelp(to, text, reportSource);
+async function sendWhatsAppText(to, text, reportSource = "BOT", options = {}) {
+  const finalText = options?.skipNavigationHelp ? String(text || "") : appendNavigationHelp(to, text, reportSource);
 
   webhookLog("sendWhatsAppText.start", {
     to: String(to),
@@ -4127,7 +4127,7 @@ async function sendReminderWhatsAppToBestTarget(priv, fallbackPhoneDigits, text)
     tried.push(to);
 
     try {
-      await sendWhatsAppText(to, text, "BOT");
+      await sendWhatsAppText(to, text, "BOT", { skipNavigationHelp: true });
       return { ok: true, to };
     } catch (e) {
       lastErr = e;
@@ -6709,7 +6709,7 @@ async function followupLeadsLoop() {
         `Si deseas, te ayudo a completarla. Solo responde con la fecha que te interesa 😊`;
 
       try {
-        await sendWhatsAppText(id, msg, "BOT");
+        await sendWhatsAppText(id, msg, "BOT", { skipNavigationHelp: true });
         s.lead.followupSent = true;
         s.lead.lastInteractionAt = new Date().toISOString();
         await saveSession(id, s);
@@ -6862,7 +6862,7 @@ async function menuInactivityReminderLoop() {
 Puedes seleccionar una opción del menú anterior o escribir *menú* para verlo nuevamente.`;
 
       try {
-        await sendWhatsAppText(id, msg, "BOT");
+        await sendWhatsAppText(id, msg, "BOT", { skipNavigationHelp: true });
         s.menuReminder.sentCount = sentCount + 1;
         s.menuReminder.lastReminderAt = new Date().toISOString();
         if (s.menuReminder.sentCount >= 1) s.menuReminder.reminder1Sent = true;
