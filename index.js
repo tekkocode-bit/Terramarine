@@ -295,6 +295,16 @@ const BOTHUB_BOT_ID = (process.env.BOTHUB_BOT_ID || "").trim();
 const HUB_QUEUE_SERVICE_TOURS = (process.env.HUB_QUEUE_SERVICE_TOURS || "Servicio al cliente / Tours").trim();
 const HUB_QUEUE_COMMERCIAL = (process.env.HUB_QUEUE_COMMERCIAL || "Asesoría comercial").trim();
 const HUB_QUEUE_NEW = (process.env.HUB_QUEUE_NEW || process.env.HUB_QUEUE_NUEVOS || "Nuevos").trim();
+// Terramarine_RD actualmente solo tiene la bandeja "Nuevos".
+// Por seguridad, todos los enrutamientos del bot se normalizan a esa bandeja
+// sin eliminar las variables antiguas ni la lógica de rutas para otros bots/versiones.
+const HUB_FORCE_SINGLE_QUEUE = (process.env.HUB_FORCE_SINGLE_QUEUE || "1") === "1";
+
+function resolveHubQueueName(queueName) {
+  const requestedQueue = String(queueName || "").trim();
+  if (HUB_FORCE_SINGLE_QUEUE && HUB_QUEUE_NEW) return HUB_QUEUE_NEW;
+  return requestedQueue;
+}
 
 const BOT_PUBLIC_BASE_URL = (process.env.BOT_PUBLIC_BASE_URL || "").replace(/\/$/, "");
 const HUB_MEDIA_SECRET =
@@ -870,8 +880,13 @@ async function findBothubConversationIdByPhone(phone) {
 }
 
 async function routeConversationToQueue({ session, phone, queueName, reason = "service_selection" }) {
-  const nextQueue = String(queueName || "").trim();
+  const requestedQueue = String(queueName || "").trim();
+  const nextQueue = resolveHubQueueName(requestedQueue);
   if (!nextQueue) return { ok: false, reason: "missing_queue" };
+
+  if (requestedQueue && requestedQueue !== nextQueue) {
+    webhookLog("bothub.queue_normalized", { requestedQueue, nextQueue, reason });
+  }
 
   if (!String(BOTHUB_JWT_TOKEN || "").trim()) {
     return { ok: false, reason: "missing_bothub_jwt" };
@@ -917,6 +932,12 @@ async function routeConversationToQueue({ session, phone, queueName, reason = "s
 function shouldRouteInboundToNewQueue(session) {
   if (!HUB_QUEUE_NEW) return false;
   if (session?.conversationMode === "human") return false;
+
+  // En Terramarine_RD solo existe la bandeja "Nuevos".
+  // En modo de bandeja única, cualquier mensaje entrante del bot debe mantenerse o corregirse a "Nuevos",
+  // incluso si una sesión vieja quedó marcada con "Asesoría comercial" u otra bandeja inexistente.
+  if (HUB_FORCE_SINGLE_QUEUE) return true;
+
   if (session?.pendingServiceLine) return false;
   if (session?.state && session.state !== "idle") return false;
   if (session?.lastQueueRouted && session.lastQueueRouted !== HUB_QUEUE_NEW) return false;
