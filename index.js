@@ -451,6 +451,10 @@ function defaultSession() {
 
     lastPackages: [],
     packageMenuMode: "main",
+    lastPackagePrograms: [],
+    pendingPackageCategory: null,
+    pendingPackageSelection: null,
+    pendingPackageProgramTitle: null,
 
     lastBooking: null,
     greeted: false,
@@ -681,6 +685,12 @@ function clearIntakeFlow(session) {
   session.pendingPromotionMonth = null;
   session.pendingPromotionGroupType = null;
   session.pendingPromotionScope = null;
+  session.pendingPackageCategory = null;
+  session.pendingPackageSelection = null;
+  session.pendingPackageProgramTitle = null;
+  session.lastPackagePrograms = [];
+  session.pendingZonePreference = null;
+  session.pendingSpecificZone = null;
 
   session.lastPackages = [];
   session.packageMenuMode = "main";
@@ -2355,9 +2365,9 @@ function detectPackageDestinationKeyFromUser(text, session = null) {
   }
 
   if (t.includes("promociones disponibles") || t === "promociones" || t === "promocion" || t.includes("ver promociones")) return "__ver_promociones__";
-  if (t.includes("sin visa")) return "destinos_sin_visa";
-  if (t.includes("visa americana")) return "destinos_con_visa_americana";
-  if (t.includes("otros visados") || t.includes("otro visado") || t.includes("visados")) return "otros_visados_asistencia";
+  if (t.includes("sin visa")) return "sin_visa_dominicanos";
+  if (t.includes("visa americana")) return "visa_americana";
+  if (t.includes("armalo") || t.includes("ármalo") || t.includes("a tu modo") || t.includes("otros visados") || t.includes("otro visado") || t.includes("visados")) return "armalo_tu_modo";
   if (t.includes("hard rock")) return "hard_rock_punta_cana_mayo_2026";
   if (t.includes("lopesan")) return "lopesan_costa_bavaro_abril_2026";
   if (t.includes("sunscape") || t.includes("dominicus")) return "sunscape_dominicus_abril_2026";
@@ -4256,10 +4266,106 @@ async function finalizePackageLead({ session, from }) {
 }
 
 const PACKAGE_MAIN_MENU_OPTIONS = [
-  { key: "destinos_sin_visa", title: "Sin visa 🇩🇴" },
-  { key: "destinos_con_visa_americana", title: "Tengo visa Americana 🇺🇸" },
-  { key: "otros_visados_asistencia", title: "Se requiere otros visados, asistencia incluida 🌐" },
+  { key: "sin_visa_dominicanos", title: "Sin visa - Dominicanos 🇩🇴" },
+  { key: "visa_americana", title: "Tengo visa americana 🇺🇸" },
+  { key: "armalo_tu_modo", title: "Ármalo a tu modo 🌐" },
 ];
+
+const PACKAGE_SIN_VISA_OPTIONS = [
+  { key: "salidas_grupales", title: "Salidas grupales" },
+  { key: "individuales", title: "Individuales" },
+  { key: "armalo_tu_modo", title: "Ármalo a tu modo" },
+];
+
+const PACKAGE_VISA_AMERICANA_OPTIONS = [
+  { key: "salidas_grupales", title: "Salidas grupales" },
+  { key: "individuales", title: "Individuales" },
+  { key: "armalo_tu_modo", title: "Ármalo a tu modo" },
+];
+
+const PACKAGE_SIN_VISA_GROUP_DESTINATIONS = [
+  { key: "brasil", title: "Brasil 🇧🇷" },
+  { key: "colombia", title: "Colombia 🇨🇴" },
+  { key: "cuba", title: "Cuba - Visa prepago 🇨🇺" },
+  { key: "dubai", title: "Emiratos Árabes - Dubái 🇦🇪" },
+  { key: "jamaica", title: "Jamaica 🇯🇲" },
+  { key: "peru", title: "Perú 🇵🇪" },
+];
+
+const PACKAGE_BRASIL_OPTIONS = [
+  { key: "rio_de_janeiro", title: "Río de Janeiro" },
+  { key: "sao_paulo", title: "São Paulo" },
+  { key: "rio_sao_paulo", title: "Río de Janeiro + São Paulo" },
+];
+
+const PACKAGE_COLOMBIA_OPTIONS = [
+  { key: "bogota", title: "Bogotá" },
+  { key: "cartagena", title: "Cartagena" },
+  { key: "medellin", title: "Medellín" },
+  { key: "bogota_cartagena", title: "Bogotá + Cartagena" },
+  { key: "bogota_medellin", title: "Bogotá + Medellín" },
+  { key: "circuito_colombiano", title: "Circuito colombiano: Bogotá + Cartagena + Medellín" },
+];
+
+const PACKAGE_CUBA_OPTIONS = [
+  { key: "habana_varadero", title: "Habana con un toque de Varadero" },
+  { key: "cayo_habana_varadero", title: "Cayo Santa María + Habana + Varadero" },
+  { key: "cuba_completo", title: "Cuba al completo" },
+];
+
+const PACKAGE_PROGRAMS = {
+  rio_de_janeiro: [
+    { key: "brasil_insuperable", title: "Brasil Insuperable", dateText: "15 - 22 mayo 2026", durationText: "8 días / 7 noches", priceText: "Desde US$2,220 por persona en ocupación doble" },
+    { key: "rio_agosto", title: "Río de Janeiro - Agosto", dateText: "22 - 28 agosto 2026", durationText: "7 días / 6 noches", priceText: "Desde US$2,590 por persona en ocupación doble" },
+    { key: "rio_septiembre", title: "Río de Janeiro - Septiembre", dateText: "30 septiembre - 06 octubre 2026", durationText: "7 días / 6 noches", priceText: "Desde US$2,590 por persona en ocupación doble" },
+    { key: "rio_fin_de_ano", title: "Fin de año en Río de Janeiro", dateText: "30 diciembre 2026 - 06 enero 2027", durationText: "8 días / 7 noches", priceText: "Desde US$3,590 por persona en ocupación doble" },
+  ],
+  sao_paulo: [
+    { key: "f1_gran_premio_sao_paulo", title: "F1 Gran Premio São Paulo - Sector G", dateText: "05 - 09 noviembre 2026", durationText: "5 días / 4 noches", priceText: "Desde US$1,720 por persona en ocupación doble" },
+    { key: "f1_sao_paulo_clasico", title: "F1 São Paulo Clásico - Sector G", dateText: "05 - 10 noviembre 2026", durationText: "6 días / 5 noches", priceText: "Desde US$2,570 por persona en ocupación doble" },
+  ],
+  rio_sao_paulo: [
+    { key: "rio_sao_paulo_personalizado", title: "Río de Janeiro + São Paulo", noteText: "Un asesor validará fechas, disponibilidad y la mejor combinación para esta ruta." },
+  ],
+  habana_varadero: [
+    { key: "habana_varadero_6d_mayo", title: "Habana con un toque de Varadero - 6 días / 5 noches", dateText: "14 - 19 mayo 2026", durationText: "6 días / 5 noches", priceText: "Desde US$1,290 por persona en ocupación doble" },
+    { key: "habana_varadero_6d_junio", title: "Habana con un toque de Varadero - 6 días / 5 noches", dateText: "04 - 09 junio 2026", durationText: "6 días / 5 noches", priceText: "Desde US$1,290 por persona en ocupación doble" },
+    { key: "habana_varadero_5d_julio", title: "Habana con un toque de Varadero - 5 días / 4 noches", dateText: "26 - 30 julio 2026", durationText: "5 días / 4 noches", priceText: "Desde US$1,290 por persona en ocupación doble" },
+    { key: "habana_varadero_5d_octubre", title: "Habana con un toque de Varadero - 5 días / 4 noches", dateText: "23 - 27 octubre 2026", durationText: "5 días / 4 noches", priceText: "Desde US$1,290 por persona en ocupación doble" },
+    { key: "habana_varadero_5d_septiembre", title: "Habana con un toque de Varadero - 5 días / 4 noches", dateText: "24 - 28 septiembre 2026", durationText: "5 días / 4 noches", priceText: "Desde US$1,290 por persona en ocupación doble" },
+  ],
+  cayo_habana_varadero: [
+    { key: "cayo_habana_varadero_agosto", title: "Cayo Santa María + Habana + Varadero", dateText: "08 - 16 agosto 2026", durationText: "9 días / 8 noches", priceText: "Desde US$1,890 por persona en ocupación doble" },
+  ],
+  cuba_completo: [
+    { key: "cuba_al_completo_agosto", title: "Cuba al completo", dateText: "08 - 16 agosto 2026", durationText: "9 días / 8 noches", priceText: "Desde US$1,890 por persona en ocupación doble" },
+  ],
+  dubai: [
+    { key: "dubai_sin_visa_octubre", title: "Dubái sin visa", dateText: "15 - 25 octubre 2026", durationText: "11 días / 8 noches", priceText: "Desde US$3,990 por persona en ocupación doble" },
+  ],
+  jamaica: [
+    { key: "montego_bay_junio", title: "Montego Bay", dateText: "11 - 15 junio 2026", durationText: "5 días / 4 noches", priceText: "Desde US$1,790 por persona en ocupación doble" },
+    { key: "montego_bay_septiembre", title: "Montego Bay", dateText: "04 - 08 septiembre 2026", durationText: "5 días / 4 noches", priceText: "Desde US$1,690 por persona en ocupación doble" },
+  ],
+  peru: [
+    { key: "peru_magico", title: "Perú Mágico", dateText: "09 - 15 julio 2026", durationText: "7 días / 6 noches", priceText: "Desde US$1,790 por persona en ocupación doble" },
+    { key: "peru_experiencia", title: "Perú más que un destino, una experiencia", dateText: "15 - 22 septiembre 2026", durationText: "8 días / 7 noches", priceText: "Desde US$1,955 por persona en ocupación doble" },
+    { key: "peru_wao_1", title: "Perú WAO 1", dateText: "16 - 24 agosto 2026", durationText: "9 días / 8 noches", priceText: "Desde US$2,090 por persona en ocupación doble" },
+    { key: "peru_wao_2", title: "Perú WAO 2", dateText: "01 - 09 noviembre 2026", durationText: "9 días / 8 noches", priceText: "Desde US$2,190 por persona en ocupación doble" },
+    { key: "peru_fin_de_ano", title: "Perú fin de año", dateText: "29 diciembre 2026 - 06 enero 2027", durationText: "9 días / 8 noches", priceText: "Desde US$2,490 por persona en ocupación doble" },
+  ],
+};
+
+const PACKAGE_ZONE_OPTIONS = [
+  { key: "no", title: "No" },
+  { key: "si", title: "Sí, especificar" },
+];
+
+const PACKAGE_INTEREST_OPTIONS = [
+  { key: "segun_paquete", title: "Según paquete" },
+  { key: "necesito_conocer", title: "Necesito conocer opciones" },
+];
+
 
 function getPackagePromotionOptions() {
   return PACKAGE_DESTINATIONS.filter((p) => !["destinos_sin_visa", "destinos_con_visa_americana", "otros_visados_asistencia", "otro_destino"].includes(p.key));
@@ -4300,6 +4406,127 @@ async function sendPackageDestinationsList(to, session = null) {
 
 async function sendPackagePromotionsList(to, session = null) {
   await sendWhatsAppText(to, formatPackagePromotionsTextList(session));
+}
+
+
+function formatPackageProgramListText(title, programs = []) {
+  if (!Array.isArray(programs) || !programs.length) {
+    return `${title}\n\nPor el momento esta opción será revisada directamente con un asesor para validar disponibilidad.`;
+  }
+
+  return (
+    `${title}\n\n` +
+    `Opciones disponibles:\n\n` +
+    programs.map((item, idx) => {
+      const lines = [`${idx + 1}. *${item.title}*`];
+      if (item.dateText) lines.push(`📅 ${item.dateText}`);
+      if (item.durationText) lines.push(`⏳ ${item.durationText}`);
+      if (item.priceText) lines.push(`💵 ${item.priceText}`);
+      if (item.noteText) lines.push(`📝 ${item.noteText}`);
+      return lines.join("\n");
+    }).join("\n\n") +
+    `\n\nResponde con el *número* de la opción que más te interesa.`
+  );
+}
+
+function setPackageProgramOptions(session, programs = [], title = "") {
+  session.lastPackagePrograms = programs.map((item) => ({ ...item }));
+  session.pendingPackageProgramTitle = title || "";
+}
+
+function parsePackageProgramChoice(session, userText) {
+  const options = Array.isArray(session?.lastPackagePrograms) ? session.lastPackagePrograms : [];
+  return parseMenuOption(userText, options);
+}
+
+async function sendPackageProgramList(to, session, programKey, title) {
+  const programs = PACKAGE_PROGRAMS[programKey] || [];
+  setPackageProgramOptions(session, programs, title);
+  session.state = "await_package_program_choice";
+  await sendWhatsAppText(to, formatPackageProgramListText(title, programs));
+}
+
+async function startPackageAdvisorContactFlow({ session, from, selectionTitle = "Paquete internacional" }) {
+  session.pendingPackageSelection = selectionTitle;
+  session.pendingDestination = selectionTitle;
+  session.state = "await_package_advisor_name";
+  await sendWhatsAppText(
+    from,
+    `Perfecto 🙌\n\n` +
+      `Para darte una cotización más puntual sobre *${selectionTitle}*, te estaremos transfiriendo con un asesor especializado.\n\n` +
+      `Antes de continuar, por favor envíanos tu *nombre completo*.`
+  );
+}
+
+function packageAdvisorSummary(session, phoneDigits) {
+  const fields = [
+    { label: "🧩 Servicio", value: serviceLineLabel(session.pendingServiceLine || "paquetes_vacacionales") },
+    { label: "🌍 Categoría", value: session.pendingPackageCategory || "Paquetes internacionales" },
+    { label: "📌 Opción seleccionada", value: session.pendingPackageSelection || session.pendingDestination || "—" },
+  ];
+  if (session.pendingPackageProgramTitle) fields.push({ label: "🗂️ Grupo", value: session.pendingPackageProgramTitle });
+  if (session.pendingTravelDateText) fields.push({ label: "📅 Fechas", value: session.pendingTravelDateText });
+  if (session.pendingPassengers) {
+    const paxBreakdown = Number(session.pendingAdults || 0) || Number(session.pendingChildren || 0)
+      ? `${session.pendingPassengers} (${session.pendingAdults || 0} adultos / ${session.pendingChildren || 0} niños)`
+      : session.pendingPassengers;
+    fields.push({ label: "👥 Cantidad de personas", value: paxBreakdown });
+  }
+  if (Number(session.pendingChildren || 0) > 0) fields.push({ label: "👶 Edades de niños", value: session.pendingChildrenAges || "No especificadas" });
+  if (session.pendingRange) fields.push({ label: "💵 Presupuesto", value: session.pendingRange });
+  if (session.pendingNotes) fields.push({ label: "📝 Notas / interés", value: session.pendingNotes });
+  if (session.pendingName) fields.push({ label: "👤 Nombre", value: session.pendingName });
+  if (session.pendingEmail) fields.push({ label: "📧 Correo", value: session.pendingEmail });
+  fields.push({ label: "📱 WhatsApp", value: phoneDigits || "—" });
+  return buildLeadSummary("Nueva solicitud de paquetes internacionales", fields);
+}
+
+async function finalizePackageAdvisorLead({ session, from }) {
+  const contactPhone = String(from || "").replace(/[^\d]/g, "");
+  const summaryText = packageAdvisorSummary(session, contactPhone);
+  updateLead(session, { tour_key: "", quotePreview: summaryText, converted: false, followupSent: false });
+  await handoffToHumanTool({ summary: summaryText });
+  await notifyPersonalWhatsAppLeadSummary(summaryText, contactPhone);
+  await sendWhatsAppText(
+    from,
+    `✅ *Solicitud recibida*\n\n` +
+      `🌍 Opción: *${session.pendingPackageSelection || session.pendingDestination || "Paquete internacional"}*\n` +
+      `👤 Nombre: *${session.pendingName || "—"}*\n` +
+      `📧 Correo: *${session.pendingEmail || "—"}*\n` +
+      `👥 Personas: *${session.pendingPassengers || "—"}*\n\n` +
+      `Te estaremos comunicando con un asesor para validar disponibilidad, cotización e informaciones más puntuales.`
+  );
+  clearIntakeFlow(session);
+}
+
+async function startPackageCustomFlow({ session, from, categoryTitle = "Ármalo a tu modo" }) {
+  session.pendingPackageCategory = categoryTitle;
+  session.pendingPackageSelection = categoryTitle;
+  session.pendingDestination = categoryTitle;
+  session.state = "await_package_custom_city";
+  await sendWhatsAppText(
+    from,
+    `🌐 *${categoryTitle}*\n\n` +
+      `Vamos a buscar la información para preparar una opción a tu medida.\n\n` +
+      `Indícame la *ciudad/es o país/es* de interés.`
+  );
+}
+
+async function startPackageVisaAdvisorFlow({ session, from, categoryTitle = "Tengo visa americana" }) {
+  session.pendingPackageCategory = categoryTitle;
+  session.pendingPackageSelection = categoryTitle;
+  session.pendingDestination = categoryTitle;
+  session.state = "await_package_advisor_name";
+  await sendWhatsAppText(
+    from,
+    `Perfecto 🇺🇸\n\n` +
+      `Te estaremos transfiriendo con un asesor para revisar las opciones disponibles según tu visa, fecha de viaje y presupuesto.\n\n` +
+      `Antes de continuar, por favor envíanos tu *nombre completo*.`
+  );
+}
+
+function isValidEmailText(text) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(text || "").trim());
 }
 
 async function sendRealTourGroupsList(to, session) {
@@ -5499,7 +5726,7 @@ app.post("/webhook", async (req, res) => {
         return res.sendStatus(200);
       }
 
-      if (["await_package_destination", "await_package_interest", "await_package_date", "await_package_adults", "await_package_children", "await_package_children_ages", "await_package_budget", "await_package_name"].includes(session.state)) {
+      if (["await_package_destination", "await_package_sin_visa_type", "await_package_visa_americana_type", "await_package_sin_visa_group_destination", "await_package_brasil_region", "await_package_colombia_option", "await_package_cuba_option", "await_package_program_choice", "await_package_advisor_name", "await_package_advisor_email", "await_package_advisor_people", "await_package_custom_city", "await_package_custom_zone_choice", "await_package_custom_zone_specify", "await_package_custom_dates", "await_package_custom_adults", "await_package_custom_children", "await_package_custom_children_ages", "await_package_custom_interests", "await_package_custom_budget", "await_package_interest", "await_package_date", "await_package_adults", "await_package_children", "await_package_children_ages", "await_package_budget", "await_package_name"].includes(session.state)) {
         const wasPromos = session.pendingServiceLine === "promociones" || session.packageMenuMode === "promos";
         clearIntakeFlow(session);
         session.pendingServiceLine = wasPromos ? "promociones" : "paquetes_vacacionales";
@@ -6422,79 +6649,265 @@ Ahora indícame tu *nombre completo*.`);
     }
 
     // =========================
-    // PACKAGE FLOW - COLOMBIA
+    // PACKAGE FLOW - PAQUETES INTERNACIONALES TERRAMARINE
     // =========================
     if (session.state === "await_package_destination") {
       const packageKey = detectPackageDestinationKeyFromUser(userText, session);
       if (!packageKey) {
         await sendWhatsAppText(from, `Selecciona una de las *opciones disponibles* respondiendo con el *número* o el *nombre* 🙏`);
-        if (session.packageMenuMode === "promos") {
-          await sendPackagePromotionsList(from, session);
-        } else {
-          await sendPackageDestinationsList(from, session);
-        }
-        return res.sendStatus(200);
-      }
-
-      if (packageKey === "__ver_promociones__") {
-        session.pendingServiceLine = "promociones";
-        session.packageMenuMode = "promos";
-        await sendWhatsAppText(from, `✨ *Promociones*
-
-Aquí te muestro las promociones disponibles para que elijas la que deseas consultar.`);
-        await sendPackagePromotionsList(from, session);
+        await sendPackageDestinationsList(from, session);
         return res.sendStatus(200);
       }
 
       disableMenuInactivityReminder(session);
-      session.pendingDestination = packageKey;
-      await sendPackagePresentation(from, getPackageDestinationByKey(packageKey));
-      if (session.packageMenuMode === "promos") {
-        session.state = "await_package_date";
-        await sendWhatsAppText(from, `Perfecto 🌍\nAhora indícame la *fecha deseada* para esta promoción.`);
-      } else {
-        session.state = "await_package_interest";
-        await sendWhatsAppText(from, `Perfecto 🌍\nAhora indícame el *destino de interés*. Si todavía no lo tienes definido, escribe *por definir*.`);
-      }
-      return res.sendStatus(200);
-    }
+      session.pendingServiceLine = "paquetes_vacacionales";
+      session.packageMenuMode = "main";
 
-    if (session.state === "await_package_interest") {
-      if (tNorm.length < 2) {
-        await sendWhatsAppText(from, `Por favor, indícame el *destino de interés*. Si todavía no lo tienes definido, puedes escribir *por definir*.`);
+      if (packageKey === "sin_visa_dominicanos" || packageKey === "destinos_sin_visa") {
+        session.pendingPackageCategory = "Sin visa - Dominicanos 🇩🇴";
+        session.state = "await_package_sin_visa_type";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇩🇴 *Sin visa - Dominicanos*", "Selecciona una opción:", PACKAGE_SIN_VISA_OPTIONS));
         return res.sendStatus(200);
       }
-      session.pendingNotes = userText;
-      session.state = "await_package_date";
-      await sendWhatsAppText(from, `Gracias. Ahora dime la *fecha deseada* para continuar.`);
+
+      if (packageKey === "visa_americana" || packageKey === "destinos_con_visa_americana") {
+        session.pendingPackageCategory = "Tengo visa americana 🇺🇸";
+        session.state = "await_package_visa_americana_type";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇺🇸 *Tengo visa americana*", "Selecciona una opción:", PACKAGE_VISA_AMERICANA_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (packageKey === "armalo_tu_modo" || packageKey === "otros_visados_asistencia" || packageKey === "otro_destino") {
+        await startPackageCustomFlow({ session, from, categoryTitle: "Ármalo a tu modo 🌐" });
+        return res.sendStatus(200);
+      }
+
+      await startPackageCustomFlow({ session, from, categoryTitle: "Paquetes internacionales" });
       return res.sendStatus(200);
     }
 
-    if (session.state === "await_package_date") {
+    if (session.state === "await_package_sin_visa_type") {
+      const option = parseMenuOption(userText, PACKAGE_SIN_VISA_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇩🇴 *Sin visa - Dominicanos*", "Selecciona una opción:", PACKAGE_SIN_VISA_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      session.pendingPackageCategory = `Sin visa - Dominicanos · ${option.title}`;
+
+      if (option.key === "salidas_grupales") {
+        session.state = "await_package_sin_visa_group_destination";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🌍 *Salidas grupales sin visa*", "Selecciona el destino que deseas ver:", PACKAGE_SIN_VISA_GROUP_DESTINATIONS));
+        return res.sendStatus(200);
+      }
+
+      if (option.key === "individuales") {
+        await startPackageCustomFlow({ session, from, categoryTitle: "Paquetes individuales sin visa" });
+        return res.sendStatus(200);
+      }
+
+      await startPackageCustomFlow({ session, from, categoryTitle: "Ármalo a tu modo · Sin visa" });
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_visa_americana_type") {
+      const option = parseMenuOption(userText, PACKAGE_VISA_AMERICANA_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇺🇸 *Tengo visa americana*", "Selecciona una opción:", PACKAGE_VISA_AMERICANA_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (option.key === "armalo_tu_modo" || option.key === "individuales") {
+        await startPackageCustomFlow({ session, from, categoryTitle: `Tengo visa americana · ${option.title}` });
+        return res.sendStatus(200);
+      }
+
+      await startPackageVisaAdvisorFlow({ session, from, categoryTitle: `Tengo visa americana · ${option.title}` });
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_sin_visa_group_destination") {
+      const option = parseMenuOption(userText, PACKAGE_SIN_VISA_GROUP_DESTINATIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🌍 *Salidas grupales sin visa*", "Selecciona el destino que deseas ver:", PACKAGE_SIN_VISA_GROUP_DESTINATIONS));
+        return res.sendStatus(200);
+      }
+
+      session.pendingPackageCategory = `Salidas grupales sin visa · ${option.title}`;
+
+      if (option.key === "brasil") {
+        session.state = "await_package_brasil_region";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇧🇷 *Brasil*", "Selecciona una opción:", PACKAGE_BRASIL_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (option.key === "colombia") {
+        session.state = "await_package_colombia_option";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇨🇴 *Colombia*", "Selecciona una opción:", PACKAGE_COLOMBIA_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (option.key === "cuba") {
+        session.state = "await_package_cuba_option";
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇨🇺 *Cuba - Visa prepago*", "Selecciona una opción:", PACKAGE_CUBA_OPTIONS));
+        return res.sendStatus(200);
+      }
+
+      if (["dubai", "jamaica", "peru"].includes(option.key)) {
+        await sendPackageProgramList(from, session, option.key, `*${option.title}*`);
+        return res.sendStatus(200);
+      }
+
+      await startPackageAdvisorContactFlow({ session, from, selectionTitle: option.title });
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_brasil_region") {
+      const option = parseMenuOption(userText, PACKAGE_BRASIL_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇧🇷 *Brasil*", "Selecciona una opción:", PACKAGE_BRASIL_OPTIONS));
+        return res.sendStatus(200);
+      }
+      await sendPackageProgramList(from, session, option.key, `🇧🇷 *${option.title}*`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_colombia_option") {
+      const option = parseMenuOption(userText, PACKAGE_COLOMBIA_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇨🇴 *Colombia*", "Selecciona una opción:", PACKAGE_COLOMBIA_OPTIONS));
+        return res.sendStatus(200);
+      }
+      await startPackageAdvisorContactFlow({ session, from, selectionTitle: `Colombia · ${option.title}` });
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_cuba_option") {
+      const option = parseMenuOption(userText, PACKAGE_CUBA_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🇨🇺 *Cuba - Visa prepago*", "Selecciona una opción:", PACKAGE_CUBA_OPTIONS));
+        return res.sendStatus(200);
+      }
+      await sendPackageProgramList(from, session, option.key, `🇨🇺 *${option.title}*`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_program_choice") {
+      const pickedProgram = parsePackageProgramChoice(session, userText);
+      if (!pickedProgram) {
+        await sendWhatsAppText(from, `Selecciona una de las opciones disponibles respondiendo con el *número* de la salida que te interesa 🙏`);
+        await sendWhatsAppText(from, formatPackageProgramListText(session.pendingPackageProgramTitle || "🌍 *Opciones disponibles*", session.lastPackagePrograms || []));
+        return res.sendStatus(200);
+      }
+
+      const detailParts = [pickedProgram.title];
+      if (pickedProgram.dateText) detailParts.push(pickedProgram.dateText);
+      if (pickedProgram.durationText) detailParts.push(pickedProgram.durationText);
+      if (pickedProgram.priceText) detailParts.push(pickedProgram.priceText);
+      session.pendingTravelDateText = pickedProgram.dateText || "";
+      session.pendingNotes = detailParts.join(" | ");
+      await startPackageAdvisorContactFlow({ session, from, selectionTitle: detailParts.join(" · ") });
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_advisor_name") {
+      if (tNorm.length < 3 || ["si", "sí", "ok", "listo"].includes(tNorm)) {
+        await sendWhatsAppText(from, `Por favor, envíame tu *nombre completo* 🙂`);
+        return res.sendStatus(200);
+      }
+      session.pendingName = userText;
+      session.state = "await_package_advisor_email";
+      await sendWhatsAppText(from, `Gracias. Ahora envíame tu *correo electrónico*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_advisor_email") {
+      if (!isValidEmailText(userText)) {
+        await sendWhatsAppText(from, `Por favor, envíame un *correo electrónico válido*. Ej: nombre@email.com`);
+        return res.sendStatus(200);
+      }
+      session.pendingEmail = userText.trim();
+      session.state = "await_package_advisor_people";
+      await sendWhatsAppText(from, `Perfecto. ¿Cuántas *personas* están interesadas?`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_advisor_people") {
+      const count = parsePassengerCount(userText);
+      if (count === null || count < 1) {
+        await sendWhatsAppText(from, `Indícame cuántas *personas* están interesadas. Ej: 2`);
+        return res.sendStatus(200);
+      }
+      session.pendingPassengers = count;
+      await finalizePackageAdvisorLead({ session, from });
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_custom_city") {
       if (tNorm.length < 2) {
-        await sendWhatsAppText(from, `Por favor, indícame la *fecha deseada* para continuar.`);
+        await sendWhatsAppText(from, `Por favor, indícame la *ciudad/es o país/es* de interés.`);
+        return res.sendStatus(200);
+      }
+      session.pendingDestination = userText;
+      session.state = "await_package_custom_zone_choice";
+      await sendWhatsAppText(from, formatNumberedOptionsText("📌 *Zona en específico*", "¿Tienes una zona en específico?", PACKAGE_ZONE_OPTIONS));
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_custom_zone_choice") {
+      const option = parseMenuOption(userText, PACKAGE_ZONE_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("📌 *Zona en específico*", "¿Tienes una zona en específico?", PACKAGE_ZONE_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingZonePreference = option.title;
+      if (option.key === "si") {
+        session.state = "await_package_custom_zone_specify";
+        await sendWhatsAppText(from, `Perfecto. Indícame la *zona específica*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingSpecificZone = "No";
+      session.state = "await_package_custom_dates";
+      await sendWhatsAppText(from, `Perfecto. Ahora indícame las *fechas de ida y vuelta*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_custom_zone_specify") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame la *zona específica*.`);
+        return res.sendStatus(200);
+      }
+      session.pendingSpecificZone = userText;
+      session.state = "await_package_custom_dates";
+      await sendWhatsAppText(from, `Perfecto. Ahora indícame las *fechas de ida y vuelta*.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_custom_dates") {
+      if (tNorm.length < 2) {
+        await sendWhatsAppText(from, `Por favor, indícame las *fechas de ida y vuelta*.`);
         return res.sendStatus(200);
       }
       session.pendingTravelDateText = userText;
-      session.state = "await_package_adults";
+      session.state = "await_package_custom_adults";
       await sendWhatsAppText(from, `Perfecto 👍\n¿Cuántos *adultos* viajarían?`);
       return res.sendStatus(200);
     }
 
-    if (session.state === "await_package_adults") {
+    if (session.state === "await_package_custom_adults") {
       const count = parsePassengerCount(userText);
       if (count === null || count < 1) {
-        await sendWhatsAppText(from, `Por favor, indícame cuántos *adultos* viajarían. Ej: 2`);
+        await sendWhatsAppText(from, `Indícame cuántos *adultos* viajarían. Ej: 2`);
         return res.sendStatus(200);
       }
       session.pendingAdults = count;
       session.pendingPassengers = count;
-      session.state = "await_package_children";
+      session.state = "await_package_custom_children";
       await sendWhatsAppText(from, `Gracias. Ahora dime cuántos *niños* viajarían. Si no van niños, responde *0*.`);
       return res.sendStatus(200);
     }
 
-    if (session.state === "await_package_children") {
+    if (session.state === "await_package_custom_children") {
       const count = parsePassengerCount(userText);
       if (count === null || count < 0) {
         await sendWhatsAppText(from, `Indícame cuántos *niños* viajarían. Si no van niños, responde *0*.`);
@@ -6503,46 +6916,51 @@ Aquí te muestro las promociones disponibles para que elijas la que deseas consu
       session.pendingChildren = count;
       session.pendingPassengers = Number(session.pendingAdults || 0) + count;
       if (count > 0) {
-        session.state = "await_package_children_ages";
+        session.state = "await_package_custom_children_ages";
         await sendWhatsAppText(from, count > 1 ? `Perfecto. Ahora indícame las *edades de los niños separadas por coma*.\nEj: 5, 8` : `Perfecto. Ahora indícame la *edad del niño*.`);
         return res.sendStatus(200);
       }
       session.pendingChildrenAges = "";
-      session.state = "await_package_budget";
-      await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la cotización.`);
+      session.state = "await_package_custom_interests";
+      await sendWhatsAppText(from, formatNumberedOptionsText("🎯 *Excursiones o puntos de interés*", "Selecciona una opción:", PACKAGE_INTEREST_OPTIONS));
       return res.sendStatus(200);
     }
 
-    if (session.state === "await_package_children_ages") {
+    if (session.state === "await_package_custom_children_ages") {
       const ages = normalizeChildrenAgesInput(userText, session.pendingChildren || 0);
       if (!ages.ok) {
         await sendWhatsAppText(from, `Por favor, envíame las *edades de los niños separadas por coma*.\nEj: 5, 8`);
         return res.sendStatus(200);
       }
       session.pendingChildrenAges = ages.formatted;
-      session.state = "await_package_budget";
-      await sendWhatsAppText(from, `Ahora indícame tu *presupuesto aproximado* para ayudarte mejor con la cotización.`);
+      session.state = "await_package_custom_interests";
+      await sendWhatsAppText(from, formatNumberedOptionsText("🎯 *Excursiones o puntos de interés*", "Selecciona una opción:", PACKAGE_INTEREST_OPTIONS));
       return res.sendStatus(200);
     }
 
-    if (session.state === "await_package_budget") {
+    if (session.state === "await_package_custom_interests") {
+      const option = parseMenuOption(userText, PACKAGE_INTEREST_OPTIONS);
+      if (!option) {
+        await sendWhatsAppText(from, formatNumberedOptionsText("🎯 *Excursiones o puntos de interés*", "Selecciona una opción:", PACKAGE_INTEREST_OPTIONS));
+        return res.sendStatus(200);
+      }
+      session.pendingNotes = `Destino: ${session.pendingDestination || "—"}. Zona: ${session.pendingSpecificZone || session.pendingZonePreference || "—"}. Interés: ${option.title}.`;
+      if (option.key === "necesito_conocer") {
+        session.pendingNotes += " Necesita conocer opciones de excursiones o puntos de interés.";
+      }
+      session.state = "await_package_custom_budget";
+      await sendWhatsAppText(from, `Perfecto. Indícame tu *presupuesto aproximado* para ayudarte mejor con la cotización.`);
+      return res.sendStatus(200);
+    }
+
+    if (session.state === "await_package_custom_budget") {
       if (tNorm.length < 2) {
         await sendWhatsAppText(from, `Por favor, indícame tu *presupuesto aproximado*.`);
         return res.sendStatus(200);
       }
       session.pendingRange = userText;
-      session.state = "await_package_name";
-      await sendWhatsAppText(from, `Perfecto ✅\nAhora indícame tu *nombre completo*.`);
-      return res.sendStatus(200);
-    }
-
-    if (session.state === "await_package_name") {
-      if (tNorm.length < 3 || ["si", "sí", "ok", "listo"].includes(tNorm)) {
-        await sendWhatsAppText(from, `Por favor, envíame tu *nombre completo* 🙂`);
-        return res.sendStatus(200);
-      }
-      session.pendingName = userText;
-      await finalizePackageLead({ session, from });
+      session.state = "await_package_advisor_name";
+      await sendWhatsAppText(from, `Perfecto ✅\nPara transferirte con un asesor, envíame tu *nombre completo*.`);
       return res.sendStatus(200);
     }
 
